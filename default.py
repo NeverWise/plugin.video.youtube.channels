@@ -414,66 +414,52 @@ def cleanTitle(title):
 
 def addLink(name,url,mode,iconimage,desc="",duration="",author=""):
         u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)
-        ok=True
         liz=xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc, "Duration": duration, "Director": author } )
         liz.setProperty('IsPlayable', 'true')
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz)
 
 def addDir(name,url,mode,iconimage):
         u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)
-        ok=True
         liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name } )
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 def addVSXDir(name,url,mode,iconimage):
-        ok=True
         liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name } )
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url="plugin://plugin.video.vidstatsx_com",listitem=liz,isFolder=True)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url="plugin://plugin.video.vidstatsx_com",listitem=liz,isFolder=True)
 
 def addChannelDir(name,url,mode,iconimage,user,desc=""):
         u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)
-        ok=True
         if iconimage=="": iconimage="DefaultFolder.png"
         liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc } )
         liz.addContextMenuItems([(translation(30026), 'XBMC.RunPlugin(plugin://'+addonID+'/?mode=playChannel&url='+user+')',),(translation(30002), 'RunPlugin(plugin://'+addonID+'/?mode=addChannel&url='+urllib.quote_plus(name+"#"+user+"#"+iconimage+"#")+')',)])
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 def addChannelFavDir(name,url,mode,iconimage,user):
         u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)
-        ok=True
         if iconimage=="": iconimage="DefaultFolder.png"
         liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name } )
         liz.addContextMenuItems([(translation(30026), 'XBMC.RunPlugin(plugin://'+addonID+'/?mode=playChannel&url='+user+')',),(translation(30024), 'RunPlugin(plugin://'+addonID+'/?mode=addToCat&url='+urllib.quote_plus(name+"#"+user+"#"+iconimage+"#")+')',),(translation(30003), 'RunPlugin(plugin://'+addonID+'/?mode=removeChannel&url='+urllib.quote_plus(name+"#"+user+"#"+iconimage+"#NoCat#")+')',)])
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 def addCatMainDir(name,url,mode,iconimage):
         u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)
-        ok=True
         liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name } )
         liz.addContextMenuItems([(translation(30009), 'RunPlugin(plugin://'+addonID+'/?mode=removeCat&url='+urllib.quote_plus(url)+')',),(translation(30012), 'RunPlugin(plugin://'+addonID+'/?mode=renameCat&url='+urllib.quote_plus(url)+')',)])
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 def addCatDir(name,url,mode,iconimage,user,cat):
         u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)
-        ok=True
         if iconimage=="": iconimage="DefaultFolder.png"
         liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
         liz.setInfo( type="Video", infoLabels={ "Title": name } )
         liz.addContextMenuItems([(translation(30026), 'XBMC.RunPlugin(plugin://'+addonID+'/?mode=playChannel&url='+user+')',),(translation(30003), 'RunPlugin(plugin://'+addonID+'/?mode=removeChannel&url='+urllib.quote_plus(name+"#"+user+"#"+iconimage+"#"+cat+"#")+')',)])
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-        return ok
+        return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 def parameters_string_to_dict(parameters):
     ''' Convert parameters encoded in a URL to a dict. '''
