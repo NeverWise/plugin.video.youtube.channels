@@ -196,11 +196,7 @@ def playVideo(youtubeID):
         return xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)
 
 def getYoutubeUrl(youtubeID):
-        if xbox==True:
-          url = "plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" + youtubeID
-        else:
-          url = "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=" + youtubeID
-        return url
+        return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
 
 def playChannel(user):
         updateThumb(user)
