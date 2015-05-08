@@ -399,9 +399,7 @@ def removeChannel(args):
 
 
 def removeCat(cat):
-	dialog = xbmcgui.Dialog()
-	ok = dialog.ok('Info:', translation(30010) + "?")
-	if ok == True:
+	if xbmcgui.Dialog().ok('Info:', translation(30010) + "?"):
 		newContent = ""
 		fh = open(channelFile, 'r')
 		for line in fh:
