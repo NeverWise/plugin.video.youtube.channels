@@ -267,7 +267,7 @@ def addChannel(args):
 			elif pl != "":
 				if pl == translation(30027):
 					pl = "NoCat"
-				channels = set(read_channels())
+				channels = set(channel for channel in read_channels() if channel[1] != id)
 				channels.add((name, id, thumb, pl))
 				write_channels(channels)
 				if showMessages == "true":
@@ -295,7 +295,7 @@ def addToCat(args):
 				addon.openSettings()
 				continue
 			elif pl != "":
-				channels = set(read_channels())
+				channels = set(channel for channel in read_channels() if channel[1] != id)
 				channels.add((name, id, thumb, pl))
 				write_channels(channels)
 				if showMessages == "true":
