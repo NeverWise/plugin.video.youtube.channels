@@ -37,7 +37,7 @@ def index():
 	addDir(translation(30001), "", "myChannels", "")
 	addDir(translation(30016), "", "listPopular", "")
 	addDir(translation(30006), "", "search", "")
-	addVSXDir("VidStatsX.com", "", "", iconVSX)
+	addVSXDir("VidStatsX.com", iconVSX)
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
@@ -84,7 +84,7 @@ def listCat(cat):
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
 	for name, user, thumb, category in read_channels():
 		if category == cat:
-			addCatDir(name, user + "#1", 'showSortSelection', thumb, user, category)
+			addCatDir(name, user + "#1", 'showSortSelection', thumb, user)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
@@ -331,7 +331,7 @@ def addDir(name, url, mode, iconimage):
 	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
 
 
-def addVSXDir(name, url, mode, iconimage):
+def addVSXDir(name, iconimage):
 	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
 	liz.setInfo(type="Video", infoLabels={"Title": name})
 	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url="plugin://plugin.video.vidstatsx_com", listitem=liz, isFolder=True)
@@ -371,7 +371,7 @@ def addCatMainDir(name, url, mode, iconimage):
 	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
 
 
-def addCatDir(name, url, mode, iconimage, user, cat):
+def addCatDir(name, url, mode, iconimage, user):
 	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
 	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
 	liz.setInfo(type="Video", infoLabels={"Title": name})
