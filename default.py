@@ -62,6 +62,10 @@ def write_channels(channels):
 		pickle.dump(channels, f)
 
 
+def get_categories():
+	return [category for category in (addon.getSetting("cat_" + str(i)) for i in range(20)) if category != ""]
+
+
 def myChannels():
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
 	categories = set()
@@ -251,43 +255,24 @@ def addChannel(args):
 		name = name[:name.find("  -  ")]
 	if "  -  " in id:
 		id = id[:id.find("  -  ")]
-	playlistsTemp = []
-	catsCount = 20
-	for i in range(0, catsCount, 1):
-		playlistsTemp.append(addon.getSetting("cat_" + str(i)))
-	playlists = []
-	playlists.append(translation(30027))
-	for pl in playlistsTemp:
-		if pl != "":
-			playlists.append(pl)
-	playlists.append("- " + translation(30005))
-	dialog = xbmcgui.Dialog()
-	index = dialog.select(translation(30004), playlists)
-	if index >= 0:
-		pl = playlists[index]
-		while ("- " + str(translation(30005)) in pl):
-			addon.openSettings()
-			playlistsTemp = []
-			for i in range(0, catsCount, 1):
-				playlistsTemp.append(addon.getSetting("cat_" + str(i)))
-			playlists = []
-			playlists.append(translation(30027))
-			for pl in playlistsTemp:
-				if pl != "":
-					playlists.append(pl)
-			playlists.append("- " + translation(30005))
-			dialog = xbmcgui.Dialog()
-			index = dialog.select(translation(30004), playlists)
-			if index >= 0:
-				pl = playlists[index]
-		if pl != "":
-			if pl == translation(30027):
-				pl = "NoCat"
-			channels = set(read_channels())
-			channels.add((name, id, thumb, pl))
-			write_channels(channels)
-		if showMessages == "true":
-			xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
+	while True:
+		playlists = [translation(30027)] + get_categories() + ["- " + translation(30005)]
+		dialog = xbmcgui.Dialog()
+		index = dialog.select(translation(30004), playlists)
+		if index >= 0:
+			pl = playlists[index]
+			if pl == playlists[-1]:
+				addon.openSettings()
+				continue
+			elif pl != "":
+				if pl == translation(30027):
+					pl = "NoCat"
+				channels = set(read_channels())
+				channels.add((name, id, thumb, pl))
+				write_channels(channels)
+				if showMessages == "true":
+					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
+		break
 
 
 def addToCat(args):
@@ -300,40 +285,23 @@ def addToCat(args):
 		name = name[:name.find("  -  ")]
 	if "  -  " in id:
 		id = id[:id.find("  -  ")]
-	playlistsTemp = []
-	catsCount = 20
-	for i in range(0, catsCount, 1):
-		playlistsTemp.append(addon.getSetting("cat_" + str(i)))
-	playlists = []
-	for pl in playlistsTemp:
-		if pl != "":
-			playlists.append(pl)
-	playlists.append("- " + translation(30005))
-	dialog = xbmcgui.Dialog()
-	index = dialog.select(translation(30004), playlists)
-	if index >= 0:
-		pl = playlists[index]
-		while ("- " + str(translation(30005)) in pl):
-			addon.openSettings()
-			playlistsTemp = []
-			for i in range(0, catsCount, 1):
-				playlistsTemp.append(addon.getSetting("cat_" + str(i)))
-			playlists = []
-			for pl in playlistsTemp:
-				if pl != "":
-					playlists.append(pl)
-			playlists.append("- " + translation(30005))
-			dialog = xbmcgui.Dialog()
-			index = dialog.select(translation(30004), playlists)
-			if index >= 0:
-				pl = playlists[index]
-		if pl != "":
-			channels = set(read_channels())
-			channels.add((name, id, thumb, pl))
-			write_channels(channels)
-		if showMessages == "true":
-			xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
-		xbmc.executebuiltin("Container.Refresh")
+	while True:
+		playlists = get_categories() + ["- " + translation(30005)]
+		dialog = xbmcgui.Dialog()
+		index = dialog.select(translation(30004), playlists)
+		if index >= 0:
+			pl = playlists[index]
+			if pl == playlists[-1]:
+				addon.openSettings()
+				continue
+			elif pl != "":
+				channels = set(read_channels())
+				channels.add((name, id, thumb, pl))
+				write_channels(channels)
+				if showMessages == "true":
+					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
+				xbmc.executebuiltin("Container.Refresh")
+		break
 
 
 def removeChannel(remove_user):
