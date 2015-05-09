@@ -272,34 +272,6 @@ def addChannel(args):
 				write_channels(channels)
 				if showMessages == "true":
 					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
-		break
-
-
-def addToCat(args):
-	args = args.replace("[B]", "").replace("[/B]", "")
-	match = re.compile('(.+?)#(.+?)#(.+?)#', re.DOTALL).findall(args)
-	name = match[0][0]
-	id = match[0][1]
-	thumb = match[0][2]
-	if "  -  " in name:
-		name = name[:name.find("  -  ")]
-	if "  -  " in id:
-		id = id[:id.find("  -  ")]
-	while True:
-		playlists = get_categories() + ["- " + translation(30005)]
-		dialog = xbmcgui.Dialog()
-		index = dialog.select(translation(30004), playlists)
-		if index >= 0:
-			pl = playlists[index]
-			if pl == playlists[-1]:
-				addon.openSettings()
-				continue
-			elif pl != "":
-				channels = set(channel for channel in read_channels() if channel[1] != id)
-				channels.add((name, id, thumb, pl))
-				write_channels(channels)
-				if showMessages == "true":
-					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
 				xbmc.executebuiltin("Container.Refresh")
 		break
 
@@ -382,7 +354,7 @@ def addChannelFavDir(name, url, mode, iconimage, user):
 	liz.setInfo(type="Video", infoLabels={"Title": name})
 	liz.addContextMenuItems([
 		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
-		(translation(30024), 'RunPlugin(plugin://' + addonID + '/?mode=addToCat&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',),
+		(translation(30024), 'RunPlugin(plugin://' + addonID + '/?mode=addChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',),
 		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(user) + ')',)
 	])
 	return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=u, listitem=liz, isFolder=True)
@@ -405,6 +377,7 @@ def addCatDir(name, url, mode, iconimage, user, cat):
 	liz.setInfo(type="Video", infoLabels={"Title": name})
 	liz.addContextMenuItems([
 		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
+		(translation(30024), 'RunPlugin(plugin://' + addonID + '/?mode=addChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',),
 		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(user) + ')',)
 	])
 	return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=u, listitem=liz, isFolder=True)
@@ -450,8 +423,6 @@ elif mode == 'favourites':
 	favourites(url)
 elif mode == 'addChannel':
 	addChannel(url)
-elif mode == 'addToCat':
-	addToCat(url)
 elif mode == 'removeChannel':
 	removeChannel(url)
 elif mode == 'removeCat':
