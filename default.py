@@ -261,17 +261,6 @@ def addChannel(args):
 		if pl != "":
 			playlists.append(pl)
 	playlists.append("- " + translation(30005))
-	if len(playlists) == 0:
-		addon.openSettings()
-		playlistsTemp = []
-		for i in range(0, catsCount, 1):
-			playlistsTemp.append(addon.getSetting("cat_" + str(i)))
-		playlists = []
-		playlists.append(translation(30027))
-		for pl in playlistsTemp:
-			if pl != "":
-				playlists.append(pl)
-		playlists.append("- " + translation(30005))
 	dialog = xbmcgui.Dialog()
 	index = dialog.select(translation(30004), playlists)
 	if index >= 0:
@@ -320,16 +309,6 @@ def addToCat(args):
 		if pl != "":
 			playlists.append(pl)
 	playlists.append("- " + translation(30005))
-	if len(playlists) == 0:
-		addon.openSettings()
-		playlistsTemp = []
-		for i in range(0, catsCount, 1):
-			playlistsTemp.append(addon.getSetting("cat_" + str(i)))
-		playlists = []
-		for pl in playlistsTemp:
-			if pl != "":
-				playlists.append(pl)
-		playlists.append("- " + translation(30005))
 	dialog = xbmcgui.Dialog()
 	index = dialog.select(translation(30004), playlists)
 	if index >= 0:
