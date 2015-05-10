@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import HTMLParser
 import json
 import os
 import pickle
@@ -61,7 +62,7 @@ def extract_videos(content):
 			yid = re.search('<a href="/watch\?v=(?P<id>[^"]+)"', entry).group('id')
 			time = re.search('<span class="video-time".*>(?P<minutes>[0-9]+):(?P<seconds>[0-9]+)</span>', entry)
 			duration = int(time.group('minutes')) * 60 + int(time.group('seconds'))
-			title = cleanTitle(re.search('<h3 class="yt-lockup-title">.*>(?P<title>[^<]+)</a>', entry).group('title'))
+			title = HTMLParser.HTMLParser().unescape(re.search('<h3 class="yt-lockup-title">.*>(?P<title>[^<]+)</a>', entry).group('title'))
 			yield yid, duration, title
 		except AttributeError:
 			continue
@@ -84,14 +85,6 @@ def getUrl(url):
 	link = response.read()
 	response.close()
 	return link
-
-
-def cleanTitle(title):
-	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß").replace("&ndash;", "-")
-	title = title.replace("&#038;", "&").replace("&#8230;", "...").replace("&#8211;", "-").replace("&#8220;", "-").replace("&#8221;", "-").replace("&#8217;", "'")
-	title = title.replace("&Auml;", "Ä").replace("&Uuml;", "Ü").replace("&Ouml;", "Ö").replace("&auml;", "ä").replace("&uuml;", "ü").replace("&ouml;", "ö")
-	title = title.strip()
-	return title
 
 
 def addDir(name, **args):
@@ -166,7 +159,7 @@ def listSearchChannels(query, page='1'):
 	entries = content.split('<li><div')[1:]
 	for entry in entries:
 		try:
-			name = cleanTitle(re.search('title="(?P<name>[^"]+)"', entry).group('name'))
+			name = HTMLParser.HTMLParser().unescape(re.search('title="(?P<name>[^"]+)"', entry).group('name'))
 			user = re.search('href="/user/(?P<user>[^"]+)"', entry).group('user')
 			try:
 				thumb = re.search('data-thumb="(?P<thumb>[^"]+)"', entry).group('thumb')
