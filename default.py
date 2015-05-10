@@ -26,7 +26,7 @@ def read_channels():
 		try:
 			with open(channelFile, 'rb') as f:
 				for channel in pickle.load(f):
-					yield channel
+					yield channel[0], channel[1], fix_thumbnail(channel[2]), channel[3]
 		except:
 			with open(channelFile) as channels:
 				for line in channels:
@@ -70,7 +70,7 @@ def extract_videos(content):
 def fix_thumbnail(thumb):
 	if thumb.startswith('//'):
 		thumb = 'https:' + thumb
-	return re.sub('/s[0-9]+([^/]+)/', '/s500\g<1>/', thumb)
+	return re.sub('/s[0-9]+([^/]+)/', '/s' + addon.getSetting('thumbnailResolution') + '\g<1>/', thumb)
 
 
 def getYoutubeUrl(youtubeID):
