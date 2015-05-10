@@ -26,6 +26,9 @@ class Channel(object):
 		self.category = category
 		self.mode = int(mode)
 
+	def __repr__(self):
+		return '{}({}, {}, {}, {}, {})'.format(self.__class__.__name__, repr(self.name), repr(self.user), repr(self.thumb), repr(self.category), repr(self.mode))
+
 	def replace(self, **attrs):
 		for attr, value in attrs.items():
 			setattr(self, attr, value)
