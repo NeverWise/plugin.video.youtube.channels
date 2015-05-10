@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import json
 import os
 import pickle
 import re
@@ -51,6 +52,18 @@ def build_context_entry(textid, **query):
 	return translation(textid), 'RunPlugin(' + build_url(**query) + ')'
 
 
+def extract_videos(content):
+	entries = content.split('<li class="channels-content-item yt-shelf-grid-item">')[1:]
+	for entry in entries:
+		try:
+			yid = re.search('<a href="/watch\?v=(?P<id>[^"]+)"', entry).group('id')
+			duration = re.search('<span class="video-time".*(?P<duration>[0-9]+:[0-9]+)</span>', entry).group('duration')
+			title = cleanTitle(re.search('<h3 class="yt-lockup-title">.*>(?P<title>[^<]+)</a>', entry).group('title'))
+			yield yid, duration, title
+		except AttributeError:
+			continue
+
+
 def getYoutubeUrl(youtubeID):
 	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
 
@@ -73,9 +86,9 @@ def getUrl(url):
 
 
 def cleanTitle(title):
-	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß").replace("&ndash;", "-")
+	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß".decode('UTF-8')).replace("&ndash;", "-")
 	title = title.replace("&#038;", "&").replace("&#8230;", "...").replace("&#8211;", "-").replace("&#8220;", "-").replace("&#8221;", "-").replace("&#8217;", "'")
-	title = title.replace("&Auml;", "Ä").replace("&Uuml;", "Ü").replace("&Ouml;", "Ö").replace("&auml;", "ä").replace("&uuml;", "ü").replace("&ouml;", "ö")
+	title = title.replace("&Auml;", "Ä".decode('UTF-8')).replace("&Uuml;", "Ü".decode('UTF-8')).replace("&Ouml;", "Ö".decode('UTF-8')).replace("&auml;", "ä".decode('UTF-8')).replace("&uuml;", "ü".decode('UTF-8')).replace("&ouml;", "ö".decode('UTF-8'))
 	title = title.strip()
 	return title
 
@@ -93,7 +106,7 @@ def addChannelDir(name, iconimage, user, title, desc):
 		build_context_entry(30026, target='playChannel', user=user),
 		build_context_entry(30002, target='addChannel', user=user, name=name, thumb=iconimage),
 	])
-	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='showSortSelection', user=user), listitem=liz, isFolder=True)
+	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
 
 
 def index():
@@ -118,7 +131,7 @@ def myChannels():
 				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
 				build_context_entry(30003, target='removeChannel', user=user),
 			])
-			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='showSortSelection', user=user), listitem=liz, isFolder=True)
+			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
 		elif category not in categories:
 			categories.add(category)
 			liz = xbmcgui.ListItem('- ' + category, iconImage="DefaultFolder.png")
@@ -144,17 +157,10 @@ def listCat(category):
 				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
 				build_context_entry(30003, target='removeChannel', user=user),
 			])
-			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='showSortSelection', user=user), listitem=liz, isFolder=True)
+			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
-
-
-def showSortSelection(user):
-	addDir(translation(30021), target='listVideos', user=user, orderby='published')
-	addDir(translation(30022), target='listVideos', user=user, orderby='viewCount')
-	addDir(translation(30023), target='listVideos', user=user, orderby='rating')
-	xbmcplugin.endOfDirectory(pluginhandle)
 
 
 def search():
@@ -180,7 +186,7 @@ def listPopular():
 		desc = ""
 		if len(match) > 0:
 			desc = match[0]
-			desc = cleanTitle(desc)
+			#desc = cleanTitle(desc)
 		match = re.compile("<yt:userId>(.+?)</yt:userId>", re.DOTALL).findall(entry)
 		thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
 		addChannelDir(user, thumb, user, "[B]" + user + "[/B]  -  " + subscribers + " Subscribers", "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
@@ -203,12 +209,12 @@ def listSearchChannels(query, offset='1'):
 		subscribers = match[0]
 		match = re.compile("<title>(.+?)</title>", re.DOTALL).findall(entry)
 		title = match[0]
-		title = cleanTitle(title)
+		#title = cleanTitle(title)
 		match = re.compile("<summary>(.+?)</summary>", re.DOTALL).findall(entry)
 		desc = ""
 		if len(match) > 0:
 			desc = match[0]
-			desc = cleanTitle(desc)
+			#desc = cleanTitle(desc)
 		match = re.compile("<yt:userId>(.+?)</yt:userId>", re.DOTALL).findall(entry)
 		thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
 		addChannelDir(title, thumb, user, "[B]" + title + "[/B]  -  " + subscribers + " Subscribers", "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
@@ -217,45 +223,24 @@ def listSearchChannels(query, offset='1'):
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
-def listVideos(user, orderby, offset='1'):
+def listVideos(user, continuation=None):
 	updateThumb(user)
-	content = getUrl("http://gdata.youtube.com/feeds/api/videos?author=" + user + "&racy=include&max-results=50&start-index=" + offset + "&orderby=" + orderby + "&v=2")
-	match = re.compile("<openSearch:totalResults>(.+?)</openSearch:totalResults><openSearch:startIndex>(.+?)</openSearch:startIndex>", re.DOTALL).findall(content)
-	maxIndex = int(match[0][0])
-	startIndex = int(match[0][1])
-	spl = content.split('<entry')
-	for i in range(1, len(spl), 1):
-		entry = spl[i]
-		match = re.compile('<yt:videoid>(.+?)</yt:videoid>', re.DOTALL).findall(entry)
-		id = match[0]
-		match = re.compile("viewCount='(.+?)'", re.DOTALL).findall(entry)
-		viewCount = "0"
-		if len(match) > 0:
-			viewCount = match[0]
-		match = re.compile("duration='(.+?)'", re.DOTALL).findall(entry)
-		durationTemp = int(match[0])
-		min = (durationTemp / 60) + 1
-		sec = durationTemp % 60
-		duration = str(min) + ":" + str(sec)
-		match = re.compile("<author><name>(.+?)</name>", re.DOTALL).findall(entry)
-		author = match[0]
-		match = re.compile("<media:title type='plain'>(.+?)</media:title>", re.DOTALL).findall(entry)
-		title = match[0]
-		title = cleanTitle(title)
-		match = re.compile("<media:description type='plain'>(.+?)</media:title>", re.DOTALL).findall(entry)
-		desc = ""
-		if len(match) > 0:
-			desc = match[0]
-			desc = cleanTitle(desc)
-		match = re.compile("<published>(.+?)T", re.DOTALL).findall(entry)
-		date = match[0]
-		thumb = "http://img.youtube.com/vi/" + id + "/0.jpg"
-		liz = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage=thumb)
-		liz.setInfo(type="Video", infoLabels={"Title": title, "Plot": "Date: " + date + "; Views: " + viewCount + "\n" + desc, "Duration": duration, "Director": author})
+	if continuation is not None:
+		jsondata = json.loads(getUrl('https://www.youtube.com' + continuation))
+		content = jsondata.get('content_html') + jsondata.get('load_more_widget_html')
+	else:
+		content = getUrl('https://www.youtube.com/user/{}/videos?view=0'.format(user)).decode('utf-8')
+	try:
+		continuation = re.search('data-uix-load-more-href="(?P<url>[^"]+)"', content).group('url').replace('&amp;', '&')
+	except AttributeError:
+		continuation = None
+	for yid, duration, title in extract_videos(content):
+		liz = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage="http://img.youtube.com/vi/" + yid + "/0.jpg")
+		liz.setInfo(type="Video", infoLabels={"Title": title, "Duration": duration})
 		liz.setProperty('IsPlayable', 'true')
-		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=id), listitem=liz)
-	if startIndex + 50 <= maxIndex:
-		addDir(translation(30007), target='listVideos', user=user, orderby=orderby, offset=int(offset) + 50)
+		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=yid), listitem=liz)
+	if continuation:
+		addDir(translation(30007), target='listVideos', user=user, continuation=continuation)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
@@ -268,23 +253,12 @@ def playVideo(url):
 
 def playChannel(user):
 	updateThumb(user)
-	content = getUrl("http://gdata.youtube.com/feeds/api/videos?author=" + user + "&racy=include&max-results=50&start-index=1&orderby=published&v=2")
-	spl = content.split('<entry')
+	content = getUrl('https://www.youtube.com/user/{}/videos?view=0'.format(user)).decode('utf-8')
 	playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
 	playlist.clear()
-	for i in range(1, len(spl), 1):
-		try:
-			entry = spl[i]
-			match = re.compile('<yt:videoid>(.+?)</yt:videoid>', re.DOTALL).findall(entry)
-			id = match[0]
-			url = getYoutubeUrl(id)
-			match = re.compile("<media:title type='plain'>(.+?)</media:title>", re.DOTALL).findall(entry)
-			title = match[0]
-			title = cleanTitle(title)
-			listitem = xbmcgui.ListItem(title)
-			playlist.add(url, listitem)
-		except:
-			pass
+	for yid, duration, title in extract_videos(content):
+		listitem = xbmcgui.ListItem(title)
+		playlist.add(getYoutubeUrl(yid), listitem)
 	xbmc.Player().play(playlist)
 
 
