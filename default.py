@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 import os
+import pickle
 import re
 import socket
 import sys
@@ -40,23 +41,36 @@ def index():
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
+def read_channels():
+	try:
+		try:
+			with open(channelFile, 'rb') as f:
+				for channel in pickle.load(f):
+					yield channel
+		except:
+			with open(channelFile) as channels:
+				for line in channels:
+					match = re.match('^(?P<name>.+?)#(?P<user>.+?)#(?P<thumb>.+?)#(?P<category>.+?)#$', line.strip())
+					if match:
+						yield match.group('name'), match.group('user'), match.group('thumb') or "DefaultFolder.png", match.group('category')
+	except IOError:
+		pass
+
+
+def write_channels(channels):
+	with open(channelFile, 'wb') as f:
+		pickle.dump(channels, f)
+
+
 def myChannels():
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
-	if os.path.exists(channelFile):
-		cats = []
-		fh = open(channelFile, 'r')
-		for line in fh:
-			match = re.compile('(.+?)#(.+?)#(.+?)#(.+?)#', re.DOTALL).findall(line)
-			name = match[0][0]
-			user = match[0][1]
-			thumb = match[0][2]
-			cat = match[0][3]
-			if cat == "NoCat":
-				addChannelFavDir(name, user + "#1", 'showSortSelection', thumb, user)
-			elif cat not in cats:
-				cats.append(cat)
-				addCatMainDir("- " + cat, cat, "listCat", "")
-		fh.close()
+	categories = set()
+	for name, user, thumb, category in read_channels():
+		if category == "NoCat":
+			addChannelFavDir(name, user + "#1", 'showSortSelection', thumb, user)
+		elif category not in categories:
+			categories.add(category)
+			addCatMainDir("- " + category, category, "listCat", "")
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
@@ -64,18 +78,9 @@ def myChannels():
 
 def listCat(cat):
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
-	if os.path.exists(channelFile):
-		fh = open(channelFile, 'r')
-		all_lines = fh.readlines()
-		for line in all_lines:
-			if cat + "#" in line:
-				match = re.compile('(.+?)#(.+?)#(.+?)#(.+?)#', re.DOTALL).findall(line)
-				name = match[0][0]
-				id = match[0][1]
-				thumb = match[0][2]
-				cat = match[0][3]
-				addCatDir(name, id + "#1", 'showSortSelection', thumb, id, cat)
-		fh.close()
+	for name, user, thumb, category in read_channels():
+		if category == cat:
+			addCatDir(name, user + "#1", 'showSortSelection', thumb, user, category)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
@@ -151,20 +156,12 @@ def listSearchChannels(params):
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
-def updateThumb(user):
-	if os.path.exists(channelFile):
-		fh = open(channelFile, 'r')
-		contentCats = fh.read()
-		fh.close()
-		if "#" + user + "#DefaultFolder.png" in contentCats:
-			content = getUrl("http://www.youtube.com/user/" + user)
-			match = re.compile('\'CHANNEL_ID\', "UC(.+?)"', re.DOTALL).findall(content)
-			thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
-			if user + "#" + thumb not in content:
-				newContent = contentCats.replace(user + "#DefaultFolder.png", user + "#" + thumb)
-				fh = open(channelFile, 'w')
-				fh.write(newContent)
-				fh.close()
+def updateThumb(edit_user):
+	def newthumb():
+		content = getUrl("http://www.youtube.com/user/" + edit_user)
+		match = re.search('\'CHANNEL_ID\', "UC(.+?)"', content)
+		return "http://img.youtube.com/i/" + match.group(0) + "/mq1.jpg"
+	write_channels([(name, user, newthumb() if user == edit_user and thumb == "DefaultFolder.png" else thumb, category) for name, user, thumb, category in read_channels()])
 
 
 def listVideos(params):
@@ -297,19 +294,9 @@ def addChannel(args):
 		if pl != "":
 			if pl == translation(30027):
 				pl = "NoCat"
-			playlistEntry = name + "#" + id + "#" + thumb + "#" + pl + "#"
-			if os.path.exists(channelFile):
-				fh = open(channelFile, 'r')
-				content = fh.read()
-				fh.close()
-				if content.find(playlistEntry) == -1:
-					fh = open(channelFile, 'a')
-					fh.write(playlistEntry + "\n")
-					fh.close()
-			else:
-				fh = open(channelFile, 'a')
-				fh.write(playlistEntry + "\n")
-				fh.close()
+			channels = set(read_channels())
+			channels.add((name, id, thumb, pl))
+			write_channels(channels)
 		if showMessages == "true":
 			xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
 
@@ -362,36 +349,16 @@ def addToCat(args):
 			if index >= 0:
 				pl = playlists[index]
 		if pl != "":
-			playlistEntry = name + "#" + id + "#" + thumb + "#" + pl + "#"
-			if os.path.exists(channelFile):
-				fh = open(channelFile, 'r')
-				content = fh.read()
-				fh.close()
-				if content.find(playlistEntry) == -1:
-					fh = open(channelFile, 'a')
-					fh.write(playlistEntry + "\n")
-					fh.close()
-			else:
-				fh = open(channelFile, 'a')
-				fh.write(playlistEntry + "\n")
-				fh.close()
+			channels = set(read_channels())
+			channels.add((name, id, thumb, pl))
+			write_channels(channels)
 		if showMessages == "true":
 			xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
 		xbmc.executebuiltin("Container.Refresh")
 
 
-def removeChannel(args):
-	match = re.compile('(.+?)#(.+?)#(.+?)#(.+?)#', re.DOTALL).findall(args)
-	name = match[0][0]
-	id = match[0][1]
-	thumb = match[0][2]
-	cat = match[0][3]
-	fh = open(channelFile, 'r')
-	content = fh.read()
-	fh.close()
-	fh = open(channelFile, 'w')
-	fh.write(content.replace(args + "\n", ""))
-	fh.close()
+def removeChannel(remove_user):
+	write_channels([channel for channel in read_channels() if channel[1] != remove_user])
 	xbmc.executebuiltin("Container.Refresh")
 	if showMessages == "true":
 		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=name) + ',5000)')
@@ -400,15 +367,7 @@ def removeChannel(args):
 
 def removeCat(cat):
 	if xbmcgui.Dialog().ok('Info:', translation(30010) + "?"):
-		newContent = ""
-		fh = open(channelFile, 'r')
-		for line in fh:
-			if "#" + cat + "#" not in line:
-				newContent += line
-		fh.close()
-		fh = open(channelFile, 'w')
-		fh.write(newContent)
-		fh.close()
+		write_channels([channel for channel in read_channels() if channel[3] != cat])
 		xbmc.executebuiltin("Container.Refresh")
 
 
@@ -417,12 +376,7 @@ def renameCat(cat):
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		newName = keyboard.getText()
-		fh = open(channelFile, 'r')
-		content = fh.read()
-		fh.close()
-		fh = open(channelFile, 'w')
-		fh.write(content.replace("#" + cat + "#", "#" + newName + "#"))
-		fh.close()
+		write_channels([(oname, ouser, othumb, newName if ocategory == cat else ocategory) for oname, ouser, othumb, ocategory in read_channels()])
 		xbmc.executebuiltin("Container.Refresh")
 
 
@@ -466,8 +420,6 @@ def addVSXDir(name, url, mode, iconimage):
 
 def addChannelDir(name, url, mode, iconimage, user, desc=""):
 	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	if iconimage == "":
-		iconimage = "DefaultFolder.png"
 	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
 	liz.setInfo(type="Video", infoLabels={"Title": name, "Plot": desc})
 	liz.addContextMenuItems([
@@ -479,14 +431,12 @@ def addChannelDir(name, url, mode, iconimage, user, desc=""):
 
 def addChannelFavDir(name, url, mode, iconimage, user):
 	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	if iconimage == "":
-		iconimage = "DefaultFolder.png"
 	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
 	liz.setInfo(type="Video", infoLabels={"Title": name})
 	liz.addContextMenuItems([
 		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
 		(translation(30024), 'RunPlugin(plugin://' + addonID + '/?mode=addToCat&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',),
-		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#NoCat#") + ')',)
+		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(user) + ')',)
 	])
 	return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=u, listitem=liz, isFolder=True)
 
@@ -504,13 +454,11 @@ def addCatMainDir(name, url, mode, iconimage):
 
 def addCatDir(name, url, mode, iconimage, user, cat):
 	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	if iconimage == "":
-		iconimage = "DefaultFolder.png"
 	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
 	liz.setInfo(type="Video", infoLabels={"Title": name})
 	liz.addContextMenuItems([
 		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
-		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#" + cat + "#") + ')',)
+		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(user) + ')',)
 	])
 	return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=u, listitem=liz, isFolder=True)
 
