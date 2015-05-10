@@ -57,7 +57,8 @@ def extract_videos(content):
 	for entry in entries:
 		try:
 			yid = re.search('<a href="/watch\?v=(?P<id>[^"]+)"', entry).group('id')
-			duration = re.search('<span class="video-time".*(?P<duration>[0-9]+:[0-9]+)</span>', entry).group('duration')
+			time = re.search('<span class="video-time".*>(?P<minutes>[0-9]+):(?P<seconds>[0-9]+)</span>', entry)
+			duration = int(time.group('minutes')) * 60 + int(time.group('seconds'))
 			title = cleanTitle(re.search('<h3 class="yt-lockup-title">.*>(?P<title>[^<]+)</a>', entry).group('title'))
 			yield yid, duration, title
 		except AttributeError:
@@ -236,7 +237,8 @@ def listVideos(user, continuation=None):
 		continuation = None
 	for yid, duration, title in extract_videos(content):
 		liz = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage="http://img.youtube.com/vi/" + yid + "/0.jpg")
-		liz.setInfo(type="Video", infoLabels={"Title": title, "Duration": duration})
+		liz.setInfo(type="Video", infoLabels={"Title": title})
+		liz.addStreamInfo('video', {'duration': duration})
 		liz.setProperty('IsPlayable', 'true')
 		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=yid), listitem=liz)
 	if continuation:
