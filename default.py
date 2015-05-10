@@ -131,7 +131,7 @@ def myChannels():
 					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
 					build_context_entry(30028, target='updateThumb', user=channel.user),
 					build_context_entry(30003, target='removeChannel', user=channel.user),
-					build_context_entry(30006, target='search'),
+					build_context_entry(30006, target='search', category=channel.category),
 				],
 				target='listVideos',
 				user=channel.user,
@@ -143,7 +143,7 @@ def myChannels():
 				contextMenu=[
 					build_context_entry(30009, target='removeCat', category=channel.category),
 					build_context_entry(30012, target='renameCat', category=channel.category),
-					build_context_entry(30006, target='search'),
+					build_context_entry(30006, target='search', category=channel.category),
 				],
 				target='listCat',
 				category=channel.category,
@@ -170,6 +170,7 @@ def listCat(category):
 					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
 					build_context_entry(30028, target='updateThumb', user=channel.user),
 					build_context_entry(30003, target='removeChannel', user=channel.user),
+					build_context_entry(30006, target='search', category=channel.category),
 				],
 				target='listVideos',
 				user=channel.user,
@@ -179,15 +180,15 @@ def listCat(category):
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
-def search():
+def search(category):
 	keyboard = xbmc.Keyboard('', translation(30006))
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		search_string = keyboard.getText()
-		xbmc.executebuiltin('ActivateWindow(videolibrary, ' + build_url(target='listSearchChannels', query=search_string) + ')')
+		xbmc.executebuiltin('ActivateWindow(videolibrary, ' + build_url(target='listSearchChannels', query=search_string, category=category) + ')')
 
 
-def listSearchChannels(query, page='1'):
+def listSearchChannels(query, category, page='1'):
 	content = getUrl('https://www.youtube.com/results', filters='channel', search_query=query, page=page)
 	entries = content.split('<li><div')[1:]
 	for entry in entries:
@@ -205,7 +206,7 @@ def listSearchChannels(query, page='1'):
 				thumbnailImage=thumb,
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=user),
-					build_context_entry(30002, target='addChannel', user=user, name=name, thumb=thumb),
+					build_context_entry(30002, target='addChannel', user=user, name=name, thumb=thumb, category=category),
 				],
 				target='listVideos',
 				user=user,
@@ -214,7 +215,7 @@ def listSearchChannels(query, page='1'):
 			continue
 	match = re.search('data-link-type="next" data-page="(?P<page>[0-9]+)"', content)
 	if match:
-		addItem(translation(30007), target='listSearchChannels', query=query, page=match.group('page'))
+		addItem(translation(30007), target='listSearchChannels', query=query, category=category, page=match.group('page'))
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
@@ -256,24 +257,23 @@ def playChannel(user):
 	xbmc.Player().play(playlist)
 
 
-def addChannel(name, user, thumb):
-	while True:
-		categories = [translation(30027)] + get_categories() + ['- ' + translation(30005)]
+def addChannel(name, user, thumb, category=None):
+	categories = [translation(30027)] + get_categories() + ['- ' + translation(30005)]
+	while category not in categories + ['NoCat']:
 		dialog = xbmcgui.Dialog()
 		index = dialog.select(translation(30004), categories)
-		if index >= 0:
+		if index < 0:
+			return
+		elif index == len(categories) - 1:
+			addon.openSettings()
+		elif index == 0:
+			category = 'NoCat'
+		else:
 			category = categories[index]
-			if category == categories[-1]:
-				addon.openSettings()
-				continue
-			elif category != '':
-				if category == translation(30027):
-					category = 'NoCat'
-				write_channels([channel for channel in read_channels() if channel.user != user] + [Channel(name, user, thumb, category)])
-				if showMessages == 'true':
-					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
-				xbmc.executebuiltin('Container.Refresh')
-		break
+	write_channels([channel for channel in read_channels() if channel.user != user] + [Channel(name, user, thumb, category)])
+	if showMessages == 'true':
+		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
+	xbmc.executebuiltin('Container.Refresh')
 
 
 def removeChannel(user):
