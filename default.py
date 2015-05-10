@@ -95,7 +95,7 @@ def fix_thumbnail(thumb):
 
 
 def getYoutubeUrl(youtubeID):
-	return ('plugin://video/YouTube/?path=/root/video&action=play_video&videoid=' if xbox else 'plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=') + youtubeID
+	return ('plugin://video/YouTube/?path=/root/video&action=play_video&videoid=' if xbox else 'plugin://plugin.video.youtube/play/?video_id=') + youtubeID
 
 
 def getUrl(url, **query):
