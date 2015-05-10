@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import json
 import os
 import pickle
@@ -16,7 +18,7 @@ import xbmcplugin
 
 
 def translation(id):
-	return addon.getLocalizedString(id).encode('utf-8')
+	return addon.getLocalizedString(id)
 
 
 def read_channels():
@@ -87,9 +89,9 @@ def getUrl(url):
 
 
 def cleanTitle(title):
-	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß".decode('UTF-8')).replace("&ndash;", "-")
+	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß").replace("&ndash;", "-")
 	title = title.replace("&#038;", "&").replace("&#8230;", "...").replace("&#8211;", "-").replace("&#8220;", "-").replace("&#8221;", "-").replace("&#8217;", "'")
-	title = title.replace("&Auml;", "Ä".decode('UTF-8')).replace("&Uuml;", "Ü".decode('UTF-8')).replace("&Ouml;", "Ö".decode('UTF-8')).replace("&auml;", "ä".decode('UTF-8')).replace("&uuml;", "ü".decode('UTF-8')).replace("&ouml;", "ö".decode('UTF-8'))
+	title = title.replace("&Auml;", "Ä").replace("&Uuml;", "Ü").replace("&Ouml;", "Ö").replace("&auml;", "ä").replace("&uuml;", "ü").replace("&ouml;", "ö")
 	title = title.strip()
 	return title
 
