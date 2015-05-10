@@ -78,8 +78,8 @@ def getYoutubeUrl(youtubeID):
 	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
 
 
-def getUrl(url):
-	req = urllib2.Request(url)
+def getUrl(url, **query):
+	req = urllib2.Request(url + ('?' + urllib.urlencode(query) if query else ''))
 	req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:19.0) Gecko/20100101 Firefox/19.0')
 	response = urllib2.urlopen(req)
 	link = response.read()
@@ -164,12 +164,12 @@ def search():
 	keyboard = xbmc.Keyboard('', translation(30006))
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
-		search_string = keyboard.getText().replace(" ", "+")
+		search_string = keyboard.getText()
 		xbmc.executebuiltin('ActivateWindow(videolibrary, ' + build_url(target='listSearchChannels', query=search_string) + ')')
 
 
 def listSearchChannels(query, page='1'):
-	content = getUrl('https://www.youtube.com/results?filters=channel&search_query={}&page={}'.format(query, page)).decode('utf-8')
+	content = getUrl('https://www.youtube.com/results', filters='channel', search_query=query, page=page).decode('utf-8')
 	entries = content.split('<li><div')[1:]
 	for entry in entries:
 		try:
@@ -204,7 +204,7 @@ def listVideos(user, continuation=None):
 		jsondata = json.loads(getUrl('https://www.youtube.com' + continuation))
 		content = jsondata.get('content_html') + jsondata.get('load_more_widget_html')
 	else:
-		content = getUrl('https://www.youtube.com/user/{}/videos?view=0'.format(user)).decode('utf-8')
+		content = getUrl('https://www.youtube.com/user/{}/videos'.format(user)).decode('utf-8')
 	try:
 		continuation = re.search('data-uix-load-more-href="(?P<url>[^"]+)"', content).group('url').replace('&amp;', '&')
 	except AttributeError:
@@ -228,7 +228,7 @@ def playVideo(url):
 
 
 def playChannel(user):
-	content = getUrl('https://www.youtube.com/user/{}/videos?view=0'.format(user)).decode('utf-8')
+	content = getUrl('https://www.youtube.com/user/{}/videos'.format(user)).decode('utf-8')
 	playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
 	playlist.clear()
 	for yid, duration, title in extract_videos(content):
