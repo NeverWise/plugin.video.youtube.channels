@@ -47,7 +47,7 @@ def get_categories():
 
 
 def build_url(**query):
-	return sys.argv[0] + '?' + urllib.urlencode(query)
+	return sys.argv[0] + '?' + urllib.urlencode({key: (value.encode('utf-8') if hasattr(value, 'encode') else value) for key, value in query.items()})
 
 
 def build_context_entry(textid, **query):
@@ -317,6 +317,6 @@ if not os.path.isdir(addon_work_folder):
 	os.mkdir(addon_work_folder)
 
 
-args = {key: (values[0] if len(values) == 1 else values) for key, values in urlparse.parse_qs(sys.argv[2][1:]).items()}
+args = {key: (values[0].decode('utf-8') if len(values) == 1 else values) for key, values in urlparse.parse_qs(sys.argv[2][1:]).items()}
 target = args.pop('target', 'index')
 locals()[target](**args)
