@@ -87,10 +87,16 @@ def getUrl(url):
 	return link
 
 
-def addDir(name, **args):
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png")
-	liz.setInfo(type="Video", infoLabels={"Title": name})
-	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(**args), listitem=liz, isFolder=True)
+def addItem(name, iconImage='DefaultFolder.png', thumbnailImage=None, contextMenu=[], isFolder=True, **args):
+	item = xbmcgui.ListItem(name)
+	if iconImage:
+		item.setIconImage(iconImage)
+	if thumbnailImage:
+		item.setThumbnailImage(thumbnailImage)
+	if contextMenu:
+		item.addContextMenuItems(contextMenu)
+	item.setInfo(type='Video', infoLabels={'Title': name})
+	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(**args), listitem=item, isFolder=isFolder)
 
 
 def myChannels():
@@ -98,26 +104,31 @@ def myChannels():
 	empty = True
 	for name, user, thumb, category in read_channels():
 		if category == "NoCat":
-			liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=thumb)
-			liz.setInfo(type="Video", infoLabels={"Title": name})
-			liz.addContextMenuItems([
-				build_context_entry(30026, target='playChannel', user=user),
-				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
-				build_context_entry(30028, target='updateThumb', user=user),
-				build_context_entry(30003, target='removeChannel', user=user),
-				build_context_entry(30006, target='search'),
-			])
-			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
+			addItem(
+				name,
+				thumbnailImage=thumb,
+				contextMenu=[
+					build_context_entry(30026, target='playChannel', user=user),
+					build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
+					build_context_entry(30028, target='updateThumb', user=user),
+					build_context_entry(30003, target='removeChannel', user=user),
+					build_context_entry(30006, target='search'),
+				],
+				target='listVideos',
+				user=user,
+			)
 		elif category not in categories:
 			categories.add(category)
-			liz = xbmcgui.ListItem('- ' + category, iconImage="DefaultFolder.png")
-			liz.setInfo(type="Video", infoLabels={"Title": category})
-			liz.addContextMenuItems([
-				build_context_entry(30009, target='removeCat', category=category),
-				build_context_entry(30012, target='renameCat', category=category),
-				build_context_entry(30006, target='search'),
-			])
-			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listCat', category=category), listitem=liz, isFolder=True)
+			addItem(
+				'- ' + category,
+				contextMenu=[
+					build_context_entry(30009, target='removeCat', category=category),
+					build_context_entry(30012, target='renameCat', category=category),
+					build_context_entry(30006, target='search'),
+				],
+				target='listCat',
+				category=category,
+			)
 		empty = False
 	if empty:
 		search()
@@ -132,15 +143,18 @@ def listCat(category):
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
 	for name, user, thumb, cat in read_channels():
 		if cat == category:
-			liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=thumb)
-			liz.setInfo(type="Video", infoLabels={"Title": name})
-			liz.addContextMenuItems([
-				build_context_entry(30026, target='playChannel', user=user),
-				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
-				build_context_entry(30028, target='updateThumb', user=user),
-				build_context_entry(30003, target='removeChannel', user=user),
-			])
-			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
+			addItem(
+				name,
+				thumbnailImage=thumb,
+				contextMenu=[
+					build_context_entry(30026, target='playChannel', user=user),
+					build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
+					build_context_entry(30028, target='updateThumb', user=user),
+					build_context_entry(30003, target='removeChannel', user=user),
+				],
+				target='listVideos',
+				user=user,
+			)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
@@ -167,19 +181,21 @@ def listSearchChannels(query, page='1'):
 				thumb = re.search('<img src="(?P<thumb>[^"]+)"', entry).group('thumb')
 			thumb = fix_thumbnail(thumb)
 			subscribers = re.search('>(?P<subscribers>[0-9.]+)</span>', entry).group('subscribers')
-			title = '[B]{}[/B] - {} subscribers'.format(name, subscribers)
-			liz = xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=thumb)
-			liz.setInfo(type="Video", infoLabels={"Title": title})
-			liz.addContextMenuItems([
-				build_context_entry(30026, target='playChannel', user=user),
-				build_context_entry(30002, target='addChannel', user=user, name=name, thumb=thumb),
-			])
-			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
+			addItem(
+				'[B]{}[/B] - {} subscribers'.format(name, subscribers),
+				thumbnailImage=thumb,
+				contextMenu=[
+					build_context_entry(30026, target='playChannel', user=user),
+					build_context_entry(30002, target='addChannel', user=user, name=name, thumb=thumb),
+				],
+				target='listVideos',
+				user=user,
+			)
 		except AttributeError:
 			continue
 	match = re.search('data-link-type="next" data-page="(?P<page>[0-9]+)"', content)
 	if match:
-		addDir(translation(30007), target='listSearchChannels', query=query, page=match.group('page'))
+		addItem(translation(30007), target='listSearchChannels', query=query, page=match.group('page'))
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
@@ -194,13 +210,13 @@ def listVideos(user, continuation=None):
 	except AttributeError:
 		continuation = None
 	for yid, duration, title in extract_videos(content):
-		liz = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage="http://img.youtube.com/vi/" + yid + "/0.jpg")
-		liz.setInfo(type="Video", infoLabels={"Title": title})
-		liz.addStreamInfo('video', {'duration': duration})
-		liz.setProperty('IsPlayable', 'true')
-		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=yid), listitem=liz)
+		item = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage="http://img.youtube.com/vi/" + yid + "/0.jpg")
+		item.setInfo(type="Video", infoLabels={"Title": title})
+		item.addStreamInfo('video', {'duration': duration})
+		item.setProperty('IsPlayable', 'true')
+		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=yid), listitem=item)
 	if continuation:
-		addDir(translation(30007), target='listVideos', user=user, continuation=continuation)
+		addItem(translation(30007), target='listVideos', user=user, continuation=continuation)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
