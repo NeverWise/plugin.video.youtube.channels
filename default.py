@@ -33,7 +33,7 @@ def read_channels():
 				for line in channels:
 					match = re.match('^(?P<name>.+?)#(?P<user>.+?)#(?P<thumb>.+?)#(?P<category>.+?)#$', line.strip())
 					if match:
-						yield match.group('name'), match.group('user'), match.group('thumb') or "DefaultFolder.png", match.group('category')
+						yield match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category')
 	except IOError:
 		pass
 
@@ -44,7 +44,7 @@ def write_channels(channels):
 
 
 def get_categories():
-	return [category for category in (addon.getSetting("cat_" + str(i)) for i in range(20)) if category != ""]
+	return [category for category in (addon.getSetting('cat_' + str(i)) for i in range(20)) if category != '']
 
 
 def build_url(**query):
@@ -75,7 +75,7 @@ def fix_thumbnail(thumb):
 
 
 def getYoutubeUrl(youtubeID):
-	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
+	return ('plugin://video/YouTube/?path=/root/video&action=play_video&videoid=' if xbox else 'plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=') + youtubeID
 
 
 def getUrl(url, **query):
@@ -103,7 +103,7 @@ def myChannels():
 	categories = set()
 	empty = True
 	for name, user, thumb, category in read_channels():
-		if category == "NoCat":
+		if category == 'NoCat':
 			addItem(
 				name,
 				thumbnailImage=thumb,
@@ -135,7 +135,7 @@ def myChannels():
 	else:
 		xbmcplugin.endOfDirectory(pluginhandle)
 		xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
-		if forceViewMode == "true":
+		if forceViewMode == 'true':
 			xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
@@ -156,7 +156,7 @@ def listCat(category):
 				user=user,
 			)
 	xbmcplugin.endOfDirectory(pluginhandle)
-	if forceViewMode == "true":
+	if forceViewMode == 'true':
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
@@ -210,15 +210,15 @@ def listVideos(user, continuation=None):
 	except AttributeError:
 		continuation = None
 	for yid, duration, title in extract_videos(content):
-		item = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage="http://img.youtube.com/vi/" + yid + "/0.jpg")
-		item.setInfo(type="Video", infoLabels={"Title": title})
+		item = xbmcgui.ListItem(title, iconImage='DefaultVideo.png', thumbnailImage='http://img.youtube.com/vi/' + yid + '/0.jpg')
+		item.setInfo(type='Video', infoLabels={'Title': title})
 		item.addStreamInfo('video', {'duration': duration})
 		item.setProperty('IsPlayable', 'true')
 		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=yid), listitem=item)
 	if continuation:
 		addItem(translation(30007), target='listVideos', user=user, continuation=continuation)
 	xbmcplugin.endOfDirectory(pluginhandle)
-	if forceViewMode == "true":
+	if forceViewMode == 'true':
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
@@ -239,7 +239,7 @@ def playChannel(user):
 
 def addChannel(name, user, thumb):
 	while True:
-		categories = [translation(30027)] + get_categories() + ["- " + translation(30005)]
+		categories = [translation(30027)] + get_categories() + ['- ' + translation(30005)]
 		dialog = xbmcgui.Dialog()
 		index = dialog.select(translation(30004), categories)
 		if index >= 0:
@@ -247,23 +247,23 @@ def addChannel(name, user, thumb):
 			if category == categories[-1]:
 				addon.openSettings()
 				continue
-			elif category != "":
+			elif category != '':
 				if category == translation(30027):
-					category = "NoCat"
+					category = 'NoCat'
 				channels = set(channel for channel in read_channels() if channel[1] != user)
 				channels.add((name, user, thumb, category))
 				write_channels(channels)
-				if showMessages == "true":
+				if showMessages == 'true':
 					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
-				xbmc.executebuiltin("Container.Refresh")
+				xbmc.executebuiltin('Container.Refresh')
 		break
 
 
 def removeChannel(user):
 	write_channels([channel for channel in read_channels() if channel[1] != user])
-	if showMessages == "true":
+	if showMessages == 'true':
 		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=user) + ',5000)')
-	xbmc.executebuiltin("Container.Refresh")
+	xbmc.executebuiltin('Container.Refresh')
 
 
 def updateThumb(user):
@@ -272,34 +272,34 @@ def updateThumb(user):
 	if thumbnail:
 		newthumb = fix_thumbnail(thumbnail.group('thumbnail'))
 		write_channels([(oname, ouser, newthumb if ouser == user else othumb, ocategory) for oname, ouser, othumb, ocategory in read_channels()])
-		xbmc.executebuiltin("Container.Refresh")
+		xbmc.executebuiltin('Container.Refresh')
 
 
 def removeCat(category):
-	if xbmcgui.Dialog().ok('Info:', translation(30010) + "?"):
+	if xbmcgui.Dialog().ok('Info:', translation(30010) + '?'):
 		write_channels([channel for channel in read_channels() if channel[3] != category])
-		xbmc.executebuiltin("Container.Refresh")
+		xbmc.executebuiltin('Container.Refresh')
 
 
 def renameCat(category):
-	keyboard = xbmc.Keyboard(category, translation(30011) + " " + category)
+	keyboard = xbmc.Keyboard(category, translation(30011) + ' ' + category)
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		newName = keyboard.getText()
 		write_channels([(oname, ouser, othumb, newName if ocategory == category else ocategory) for oname, ouser, othumb, ocategory in read_channels()])
-		xbmc.executebuiltin("Container.Refresh")
+		xbmc.executebuiltin('Container.Refresh')
 
 
 socket.setdefaulttimeout(30)
 pluginhandle = int(sys.argv[1])
 addonID = 'plugin.video.youtube.channels'
-xbox = xbmc.getCondVisibility("System.Platform.xbox")
+xbox = xbmc.getCondVisibility('System.Platform.xbox')
 addon = xbmcaddon.Addon(addonID)
-addon_work_folder = xbmc.translatePath("special://profile/addon_data/" + addonID)
-channelFile = xbmc.translatePath("special://profile/addon_data/" + addonID + "/youtube.channels")
-forceViewMode = addon.getSetting("forceView")
-viewMode = str(addon.getSetting("viewMode"))
-showMessages = str(addon.getSetting("showMessages"))
+addon_work_folder = xbmc.translatePath('special://profile/addon_data/' + addonID)
+channelFile = xbmc.translatePath('special://profile/addon_data/' + addonID + '/youtube.channels')
+forceViewMode = addon.getSetting('forceView')
+viewMode = str(addon.getSetting('viewMode'))
+showMessages = str(addon.getSetting('showMessages'))
 
 if not os.path.isdir(addon_work_folder):
 	os.mkdir(addon_work_folder)
