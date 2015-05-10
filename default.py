@@ -19,11 +19,12 @@ import xbmcplugin
 
 
 class Channel(object):
-	def __init__(self, name, user, thumb, category):
+	def __init__(self, name, user, thumb, category, mode=0):
 		self.name = name
 		self.user = user
 		self.thumb = fix_thumbnail(thumb)
 		self.category = category
+		self.mode = int(mode)
 
 	def replace(self, **attrs):
 		for attr, value in attrs.items():
@@ -49,7 +50,7 @@ def read_channels():
 				for line in channels:
 					match = re.match('^(?P<name>.+?)#(?P<user>.+?)#(?P<thumb>.+?)#(?P<category>.+?)#$', line.strip())
 					if match:
-						yield Channel(match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category'))
+						yield Channel(match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category'), 0)
 	except IOError:
 		pass
 
@@ -129,12 +130,14 @@ def myChannels():
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=channel.user),
 					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
+					build_context_entry(30030, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb, category=channel.category, mode=54 if channel.mode == 0 else 0),
 					build_context_entry(30028, target='updateThumb', user=channel.user),
 					build_context_entry(30003, target='removeChannel', user=channel.user),
 					build_context_entry(30006, target='search', category=channel.category),
 				],
 				target='listVideos',
 				user=channel.user,
+				mode=channel.mode,
 			)
 		elif channel.category not in categories:
 			categories.add(channel.category)
@@ -168,12 +171,14 @@ def listCat(category):
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=channel.user),
 					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
+					build_context_entry(30030, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb, category=channel.category, mode=54 if channel.mode == 0 else 0),
 					build_context_entry(30028, target='updateThumb', user=channel.user),
 					build_context_entry(30003, target='removeChannel', user=channel.user),
 					build_context_entry(30006, target='search', category=channel.category),
 				],
 				target='listVideos',
 				user=channel.user,
+				mode=channel.mode,
 			)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == 'true':
@@ -219,12 +224,12 @@ def listSearchChannels(query, category, page='1'):
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
-def listVideos(user, continuation=None):
+def listVideos(user, mode=0, continuation=None):
 	if continuation is not None:
 		jsondata = json.loads(getUrl('https://www.youtube.com' + continuation))
 		content = jsondata.get('content_html') + jsondata.get('load_more_widget_html')
 	else:
-		content = getUrl('https://www.youtube.com/user/{}/videos'.format(user))
+		content = getUrl('https://www.youtube.com/user/{}/videos'.format(user), view=mode)
 	try:
 		continuation = re.search('data-uix-load-more-href="(?P<url>[^"]+)"', content).group('url').replace('&amp;', '&')
 	except AttributeError:
@@ -236,7 +241,7 @@ def listVideos(user, continuation=None):
 		item.setProperty('IsPlayable', 'true')
 		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=yid), listitem=item)
 	if continuation:
-		addItem(translation(30007), target='listVideos', user=user, continuation=continuation)
+		addItem(translation(30007), target='listVideos', user=user, mode=mode, continuation=continuation)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == 'true':
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
@@ -247,8 +252,8 @@ def playVideo(url):
 	return xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)
 
 
-def playChannel(user):
-	content = getUrl('https://www.youtube.com/user/{}/videos'.format(user))
+def playChannel(user, mode=0):
+	content = getUrl('https://www.youtube.com/user/{}/videos'.format(user), view=mode)
 	playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
 	playlist.clear()
 	for yid, duration, title in extract_videos(content):
@@ -257,7 +262,7 @@ def playChannel(user):
 	xbmc.Player().play(playlist)
 
 
-def addChannel(name, user, thumb, category=None):
+def addChannel(name, user, thumb, category=None, mode=0):
 	categories = [translation(30027)] + get_categories() + ['- ' + translation(30005)]
 	while category not in categories + ['NoCat']:
 		dialog = xbmcgui.Dialog()
@@ -270,7 +275,7 @@ def addChannel(name, user, thumb, category=None):
 			category = 'NoCat'
 		else:
 			category = categories[index]
-	write_channels([channel for channel in read_channels() if channel.user != user] + [Channel(name, user, thumb, category)])
+	write_channels([channel for channel in read_channels() if channel.user != user] + [Channel(name, user, thumb, category, mode)])
 	if showMessages == 'true':
 		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
 	xbmc.executebuiltin('Container.Refresh')
