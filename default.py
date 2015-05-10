@@ -71,14 +71,6 @@ def getYoutubeUrl(youtubeID):
 	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
 
 
-def updateThumb(edit_user):
-	def newthumb():
-		content = getUrl("http://www.youtube.com/user/" + edit_user)
-		match = re.search('\'CHANNEL_ID\', "UC(.+?)"', content)
-		return "http://img.youtube.com/i/" + match.group(0) + "/mq1.jpg"
-	write_channels([(name, user, newthumb() if user == edit_user and thumb == "DefaultFolder.png" else thumb, category) for name, user, thumb, category in read_channels()])
-
-
 def getUrl(url):
 	req = urllib2.Request(url)
 	req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:19.0) Gecko/20100101 Firefox/19.0')
@@ -227,7 +219,6 @@ def listSearchChannels(query, offset='1'):
 
 
 def listVideos(user, continuation=None):
-	updateThumb(user)
 	if continuation is not None:
 		jsondata = json.loads(getUrl('https://www.youtube.com' + continuation))
 		content = jsondata.get('content_html') + jsondata.get('load_more_widget_html')
@@ -256,7 +247,6 @@ def playVideo(url):
 
 
 def playChannel(user):
-	updateThumb(user)
 	content = getUrl('https://www.youtube.com/user/{}/videos?view=0'.format(user)).decode('utf-8')
 	playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
 	playlist.clear()
