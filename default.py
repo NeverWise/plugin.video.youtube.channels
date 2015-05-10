@@ -7,38 +7,15 @@ import socket
 import sys
 import urllib
 import urllib2
+import urlparse
 
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
 
 
-socket.setdefaulttimeout(30)
-pluginhandle = int(sys.argv[1])
-addonID = 'plugin.video.youtube.channels'
-xbox = xbmc.getCondVisibility("System.Platform.xbox")
-addon = xbmcaddon.Addon(addonID)
-addon_work_folder = xbmc.translatePath("special://profile/addon_data/" + addonID)
-channelFile = xbmc.translatePath("special://profile/addon_data/" + addonID + "/youtube.channels")
-iconVSX = xbmc.translatePath('special://home/addons/' + addonID + '/iconVSX.png')
-forceViewMode = addon.getSetting("forceView")
-viewMode = str(addon.getSetting("viewMode"))
-showMessages = str(addon.getSetting("showMessages"))
-
-if not os.path.isdir(addon_work_folder):
-	os.mkdir(addon_work_folder)
-
-
 def translation(id):
 	return addon.getLocalizedString(id).encode('utf-8')
-
-
-def index():
-	addDir(translation(30001), "", "myChannels", "")
-	addDir(translation(30016), "", "listPopular", "")
-	addDir(translation(30006), "", "search", "")
-	addVSXDir("VidStatsX.com", iconVSX)
-	xbmcplugin.endOfDirectory(pluginhandle)
 
 
 def read_channels():
@@ -66,34 +43,117 @@ def get_categories():
 	return [category for category in (addon.getSetting("cat_" + str(i)) for i in range(20)) if category != ""]
 
 
+def build_url(**query):
+	return sys.argv[0] + '?' + urllib.urlencode(query)
+
+
+def build_context_entry(textid, **query):
+	return translation(textid), 'RunPlugin(' + build_url(**query) + ')'
+
+
+def getYoutubeUrl(youtubeID):
+	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
+
+
+def updateThumb(edit_user):
+	def newthumb():
+		content = getUrl("http://www.youtube.com/user/" + edit_user)
+		match = re.search('\'CHANNEL_ID\', "UC(.+?)"', content)
+		return "http://img.youtube.com/i/" + match.group(0) + "/mq1.jpg"
+	write_channels([(name, user, newthumb() if user == edit_user and thumb == "DefaultFolder.png" else thumb, category) for name, user, thumb, category in read_channels()])
+
+
+def getUrl(url):
+	req = urllib2.Request(url)
+	req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:19.0) Gecko/20100101 Firefox/19.0')
+	response = urllib2.urlopen(req)
+	link = response.read()
+	response.close()
+	return link
+
+
+def cleanTitle(title):
+	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß").replace("&ndash;", "-")
+	title = title.replace("&#038;", "&").replace("&#8230;", "...").replace("&#8211;", "-").replace("&#8220;", "-").replace("&#8221;", "-").replace("&#8217;", "'")
+	title = title.replace("&Auml;", "Ä").replace("&Uuml;", "Ü").replace("&Ouml;", "Ö").replace("&auml;", "ä").replace("&uuml;", "ü").replace("&ouml;", "ö")
+	title = title.strip()
+	return title
+
+
+def addDir(name, **args):
+	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png")
+	liz.setInfo(type="Video", infoLabels={"Title": name})
+	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(**args), listitem=liz, isFolder=True)
+
+
+def addChannelDir(name, iconimage, user, title, desc):
+	liz = xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
+	liz.setInfo(type="Video", infoLabels={"Title": title, "Plot": desc})
+	liz.addContextMenuItems([
+		build_context_entry(30026, target='playChannel', user=user),
+		build_context_entry(30002, target='addChannel', user=user, name=name, thumb=iconimage),
+	])
+	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='showSortSelection', user=user), listitem=liz, isFolder=True)
+
+
+def index():
+	addDir(translation(30001), target='myChannels')
+	addDir(translation(30016), target='listPopular')
+	addDir(translation(30006), target='search')
+	liz = xbmcgui.ListItem("VidStatsX.com", iconImage="DefaultFolder.png", thumbnailImage=iconVSX)
+	liz.setInfo(type="Video", infoLabels={"Title": "VidStatsX.com"})
+	xbmcplugin.addDirectoryItem(handle=pluginhandle, url="plugin://plugin.video.vidstatsx_com", listitem=liz, isFolder=True)
+	xbmcplugin.endOfDirectory(pluginhandle)
+
+
 def myChannels():
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
 	categories = set()
 	for name, user, thumb, category in read_channels():
 		if category == "NoCat":
-			addChannelFavDir(name, user + "#1", 'showSortSelection', thumb, user)
+			liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=thumb)
+			liz.setInfo(type="Video", infoLabels={"Title": name})
+			liz.addContextMenuItems([
+				build_context_entry(30026, target='playChannel', user=user),
+				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
+				build_context_entry(30003, target='removeChannel', user=user),
+			])
+			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='showSortSelection', user=user), listitem=liz, isFolder=True)
 		elif category not in categories:
 			categories.add(category)
-			addCatMainDir("- " + category, category, "listCat", "")
+			liz = xbmcgui.ListItem('- ' + category, iconImage="DefaultFolder.png")
+			liz.setInfo(type="Video", infoLabels={"Title": category})
+			liz.addContextMenuItems([
+				build_context_entry(30009, target='removeCat', category=category),
+				build_context_entry(30012, target='renameCat', category=category),
+			])
+			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listCat', category=category), listitem=liz, isFolder=True)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
-def listCat(cat):
+def listCat(category):
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
-	for name, user, thumb, category in read_channels():
-		if category == cat:
-			addCatDir(name, user + "#1", 'showSortSelection', thumb, user)
+	for name, user, thumb, cat in read_channels():
+		if cat == category:
+			liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=thumb)
+			liz.setInfo(type="Video", infoLabels={"Title": name})
+			liz.addContextMenuItems([
+				build_context_entry(30026, target='playChannel', user=user),
+				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
+				build_context_entry(30003, target='removeChannel', user=user),
+			])
+			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='showSortSelection', user=user), listitem=liz, isFolder=True)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
-def showSortSelection(url):
-	addDir(translation(30021), url + "#published", "listVideos", "")
-	addDir(translation(30022), url + "#viewCount", "listVideos", "")
-	addDir(translation(30023), url + "#rating", "listVideos", "")
+def showSortSelection(user):
+	addDir(translation(30021), target='listVideos', user=user, orderby='published')
+	addDir(translation(30022), target='listVideos', user=user, orderby='viewCount')
+	addDir(translation(30023), target='listVideos', user=user, orderby='rating')
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
@@ -102,7 +162,7 @@ def search():
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		search_string = keyboard.getText().replace(" ", "+")
-		listSearchChannels(search_string + "#1")
+		listSearchChannels(search_string)
 
 
 def listPopular():
@@ -123,15 +183,12 @@ def listPopular():
 			desc = cleanTitle(desc)
 		match = re.compile("<yt:userId>(.+?)</yt:userId>", re.DOTALL).findall(entry)
 		thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
-		addChannelDir("[B]" + user + "[/B]  -  " + subscribers + " Subscribers", user + "#1", 'showSortSelection', thumb, user, "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
+		addChannelDir(user, thumb, user, "[B]" + user + "[/B]  -  " + subscribers + " Subscribers", "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
-def listSearchChannels(params):
-	spl = params.split("#")
-	search = spl[0]
-	index = spl[1]
-	content = getUrl("https://gdata.youtube.com/feeds/api/channels?q=" + search + "&start-index=" + index + "&max-results=50&v=2")
+def listSearchChannels(query, offset='1'):
+	content = getUrl("https://gdata.youtube.com/feeds/api/channels?q=" + query + "&start-index=" + offset + "&max-results=50&v=2")
 	match = re.compile("<openSearch:totalResults>(.+?)</openSearch:totalResults><openSearch:startIndex>(.+?)</openSearch:startIndex>", re.DOTALL).findall(content)
 	maxIndex = int(match[0][0])
 	startIndex = int(match[0][1])
@@ -154,27 +211,15 @@ def listSearchChannels(params):
 			desc = cleanTitle(desc)
 		match = re.compile("<yt:userId>(.+?)</yt:userId>", re.DOTALL).findall(entry)
 		thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
-		addChannelDir("[B]" + title + "[/B]  -  " + subscribers + " Subscribers", user + "#1", 'showSortSelection', thumb, user, "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
+		addChannelDir(title, thumb, user, "[B]" + title + "[/B]  -  " + subscribers + " Subscribers", "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
 	if startIndex + 50 <= maxIndex:
-		addDir(translation(30007), search + "#" + str(int(index) + 50), 'listSearchChannels', "")
+		addDir(translation(30007), target='listSearchChannels', query=query, offset=int(offset) + 50)
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
-def updateThumb(edit_user):
-	def newthumb():
-		content = getUrl("http://www.youtube.com/user/" + edit_user)
-		match = re.search('\'CHANNEL_ID\', "UC(.+?)"', content)
-		return "http://img.youtube.com/i/" + match.group(0) + "/mq1.jpg"
-	write_channels([(name, user, newthumb() if user == edit_user and thumb == "DefaultFolder.png" else thumb, category) for name, user, thumb, category in read_channels()])
-
-
-def listVideos(params):
-	spl = params.split("#")
-	user = spl[0]
-	index = spl[1]
-	orderby = spl[2]
+def listVideos(user, orderby, offset='1'):
 	updateThumb(user)
-	content = getUrl("http://gdata.youtube.com/feeds/api/videos?author=" + user + "&racy=include&max-results=50&start-index=" + index + "&orderby=" + orderby + "&v=2")
+	content = getUrl("http://gdata.youtube.com/feeds/api/videos?author=" + user + "&racy=include&max-results=50&start-index=" + offset + "&orderby=" + orderby + "&v=2")
 	match = re.compile("<openSearch:totalResults>(.+?)</openSearch:totalResults><openSearch:startIndex>(.+?)</openSearch:startIndex>", re.DOTALL).findall(content)
 	maxIndex = int(match[0][0])
 	startIndex = int(match[0][1])
@@ -205,22 +250,20 @@ def listVideos(params):
 		match = re.compile("<published>(.+?)T", re.DOTALL).findall(entry)
 		date = match[0]
 		thumb = "http://img.youtube.com/vi/" + id + "/0.jpg"
-		addLink(title, id, 'playVideo', thumb, "Date: " + date + "; Views: " + viewCount + "\n" + desc, duration, author)
+		liz = xbmcgui.ListItem(title, iconImage="DefaultVideo.png", thumbnailImage=thumb)
+		liz.setInfo(type="Video", infoLabels={"Title": title, "Plot": "Date: " + date + "; Views: " + viewCount + "\n" + desc, "Duration": duration, "Director": author})
+		liz.setProperty('IsPlayable', 'true')
+		xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='playVideo', url=id), listitem=liz)
 	if startIndex + 50 <= maxIndex:
-		addDir(translation(30007), user + "#" + str(int(index) + 50) + "#" + orderby, 'listVideos', "")
+		addDir(translation(30007), target='listVideos', user=user, orderby=orderby, offset=int(offset) + 50)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == "true":
 		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
-def playVideo(youtubeID):
-	url = getYoutubeUrl(youtubeID)
-	listitem = xbmcgui.ListItem(path=url)
+def playVideo(url):
+	listitem = xbmcgui.ListItem(path=getYoutubeUrl(url))
 	return xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)
-
-
-def getYoutubeUrl(youtubeID):
-	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
 
 
 def playChannel(user):
@@ -245,30 +288,21 @@ def playChannel(user):
 	xbmc.Player().play(playlist)
 
 
-def addChannel(args):
-	args = args.replace("[B]", "").replace("[/B]", "")
-	match = re.compile('(.+?)#(.+?)#(.+?)#', re.DOTALL).findall(args)
-	name = match[0][0]
-	id = match[0][1]
-	thumb = match[0][2]
-	if "  -  " in name:
-		name = name[:name.find("  -  ")]
-	if "  -  " in id:
-		id = id[:id.find("  -  ")]
+def addChannel(name, user, thumb):
 	while True:
-		playlists = [translation(30027)] + get_categories() + ["- " + translation(30005)]
+		categories = [translation(30027)] + get_categories() + ["- " + translation(30005)]
 		dialog = xbmcgui.Dialog()
-		index = dialog.select(translation(30004), playlists)
+		index = dialog.select(translation(30004), categories)
 		if index >= 0:
-			pl = playlists[index]
-			if pl == playlists[-1]:
+			category = categories[index]
+			if category == categories[-1]:
 				addon.openSettings()
 				continue
-			elif pl != "":
-				if pl == translation(30027):
-					pl = "NoCat"
-				channels = set(channel for channel in read_channels() if channel[1] != id)
-				channels.add((name, id, thumb, pl))
+			elif category != "":
+				if category == translation(30027):
+					category = "NoCat"
+				channels = set(channel for channel in read_channels() if channel[1] != user)
+				channels.add((name, user, thumb, category))
 				write_channels(channels)
 				if showMessages == "true":
 					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
@@ -276,158 +310,45 @@ def addChannel(args):
 		break
 
 
-def removeChannel(remove_user):
-	write_channels([channel for channel in read_channels() if channel[1] != remove_user])
+def removeChannel(user):
+	write_channels([channel for channel in read_channels() if channel[1] != user])
 	xbmc.executebuiltin("Container.Refresh")
 	if showMessages == "true":
-		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=name) + ',5000)')
+		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=user) + ',5000)')
 	xbmc.executebuiltin("Container.Refresh")
 
 
-def removeCat(cat):
+def removeCat(category):
 	if xbmcgui.Dialog().ok('Info:', translation(30010) + "?"):
-		write_channels([channel for channel in read_channels() if channel[3] != cat])
+		write_channels([channel for channel in read_channels() if channel[3] != category])
 		xbmc.executebuiltin("Container.Refresh")
 
 
-def renameCat(cat):
-	keyboard = xbmc.Keyboard(cat, translation(30011) + " " + cat)
+def renameCat(category):
+	keyboard = xbmc.Keyboard(category, translation(30011) + " " + category)
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		newName = keyboard.getText()
-		write_channels([(oname, ouser, othumb, newName if ocategory == cat else ocategory) for oname, ouser, othumb, ocategory in read_channels()])
+		write_channels([(oname, ouser, othumb, newName if ocategory == category else ocategory) for oname, ouser, othumb, ocategory in read_channels()])
 		xbmc.executebuiltin("Container.Refresh")
 
 
-def getUrl(url):
-	req = urllib2.Request(url)
-	req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:19.0) Gecko/20100101 Firefox/19.0')
-	response = urllib2.urlopen(req)
-	link = response.read()
-	response.close()
-	return link
+socket.setdefaulttimeout(30)
+pluginhandle = int(sys.argv[1])
+addonID = 'plugin.video.youtube.channels'
+xbox = xbmc.getCondVisibility("System.Platform.xbox")
+addon = xbmcaddon.Addon(addonID)
+addon_work_folder = xbmc.translatePath("special://profile/addon_data/" + addonID)
+channelFile = xbmc.translatePath("special://profile/addon_data/" + addonID + "/youtube.channels")
+iconVSX = xbmc.translatePath('special://home/addons/' + addonID + '/iconVSX.png')
+forceViewMode = addon.getSetting("forceView")
+viewMode = str(addon.getSetting("viewMode"))
+showMessages = str(addon.getSetting("showMessages"))
+
+if not os.path.isdir(addon_work_folder):
+	os.mkdir(addon_work_folder)
 
 
-def cleanTitle(title):
-	title = title.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&#039;", "\\").replace("&quot;", "\"").replace("&szlig;", "ß").replace("&ndash;", "-")
-	title = title.replace("&#038;", "&").replace("&#8230;", "...").replace("&#8211;", "-").replace("&#8220;", "-").replace("&#8221;", "-").replace("&#8217;", "'")
-	title = title.replace("&Auml;", "Ä").replace("&Uuml;", "Ü").replace("&Ouml;", "Ö").replace("&auml;", "ä").replace("&uuml;", "ü").replace("&ouml;", "ö")
-	title = title.strip()
-	return title
-
-
-def addLink(name, url, mode, iconimage, desc="", duration="", author=""):
-	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	liz = xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name, "Plot": desc, "Duration": duration, "Director": author})
-	liz.setProperty('IsPlayable', 'true')
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz)
-
-
-def addDir(name, url, mode, iconimage):
-	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name})
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
-
-
-def addVSXDir(name, iconimage):
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name})
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url="plugin://plugin.video.vidstatsx_com", listitem=liz, isFolder=True)
-
-
-def addChannelDir(name, url, mode, iconimage, user, desc=""):
-	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name, "Plot": desc})
-	liz.addContextMenuItems([
-		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
-		(translation(30002), 'RunPlugin(plugin://' + addonID + '/?mode=addChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',)
-	])
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
-
-
-def addChannelFavDir(name, url, mode, iconimage, user):
-	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name})
-	liz.addContextMenuItems([
-		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
-		(translation(30024), 'RunPlugin(plugin://' + addonID + '/?mode=addChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',),
-		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(user) + ')',)
-	])
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
-
-
-def addCatMainDir(name, url, mode, iconimage):
-	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name})
-	liz.addContextMenuItems([
-		(translation(30009), 'RunPlugin(plugin://' + addonID + '/?mode=removeCat&url=' + urllib.quote_plus(url) + ')',),
-		(translation(30012), 'RunPlugin(plugin://' + addonID + '/?mode=renameCat&url=' + urllib.quote_plus(url) + ')',)
-	])
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
-
-
-def addCatDir(name, url, mode, iconimage, user):
-	u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode)
-	liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": name})
-	liz.addContextMenuItems([
-		(translation(30026), 'XBMC.RunPlugin(plugin://' + addonID + '/?mode=playChannel&url=' + user + ')',),
-		(translation(30024), 'RunPlugin(plugin://' + addonID + '/?mode=addChannel&url=' + urllib.quote_plus(name + "#" + user + "#" + iconimage + "#") + ')',),
-		(translation(30003), 'RunPlugin(plugin://' + addonID + '/?mode=removeChannel&url=' + urllib.quote_plus(user) + ')',)
-	])
-	return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=u, listitem=liz, isFolder=True)
-
-
-def parameters_string_to_dict(parameters):
-	''' Convert parameters encoded in a URL to a dict. '''
-	paramDict = {}
-	if parameters:
-		paramPairs = parameters[1:].split("&")
-		for paramsPair in paramPairs:
-			paramSplits = paramsPair.split('=')
-			if (len(paramSplits)) == 2:
-				paramDict[paramSplits[0]] = paramSplits[1]
-	return paramDict
-
-
-params = parameters_string_to_dict(sys.argv[2])
-mode = params.get('mode')
-url = params.get('url')
-if type(url) == type(str()):
-	url = urllib.unquote_plus(url)
-
-if mode == 'search':
-	search()
-elif mode == 'myChannels':
-	myChannels()
-elif mode == 'listPopular':
-	listPopular()
-elif mode == 'listSearchChannels':
-	listSearchChannels(url)
-elif mode == 'showSortSelection':
-	showSortSelection(url)
-elif mode == 'listVideos':
-	listVideos(url)
-elif mode == 'listCat':
-	listCat(url)
-elif mode == 'playVideo':
-	playVideo(url)
-elif mode == 'playChannel':
-	playChannel(url)
-elif mode == 'favourites':
-	favourites(url)
-elif mode == 'addChannel':
-	addChannel(url)
-elif mode == 'removeChannel':
-	removeChannel(url)
-elif mode == 'removeCat':
-	removeCat(url)
-elif mode == 'renameCat':
-	renameCat(url)
-else:
-	index()
+args = {key: (values[0] if len(values) == 1 else values) for key, values in urlparse.parse_qs(sys.argv[2][1:]).items()}
+target = args.pop('target', 'index')
+locals()[target](**args)
