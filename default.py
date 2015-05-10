@@ -67,6 +67,12 @@ def extract_videos(content):
 			continue
 
 
+def fix_thumbnail(thumb):
+	if thumb.startswith('//'):
+		thumb = 'https:' + thumb
+	return re.sub('/s[0-9]+([^/]+)/', '/s500\g<1>/', thumb)
+
+
 def getYoutubeUrl(youtubeID):
 	return ("plugin://video/YouTube/?path=/root/video&action=play_video&videoid=" if xbox else "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=") + youtubeID
 
@@ -104,6 +110,7 @@ def myChannels():
 			liz.addContextMenuItems([
 				build_context_entry(30026, target='playChannel', user=user),
 				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
+				build_context_entry(30028, target='updateThumb', user=user),
 				build_context_entry(30003, target='removeChannel', user=user),
 				build_context_entry(30006, target='search'),
 			])
@@ -137,6 +144,7 @@ def listCat(category):
 			liz.addContextMenuItems([
 				build_context_entry(30026, target='playChannel', user=user),
 				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
+				build_context_entry(30028, target='updateThumb', user=user),
 				build_context_entry(30003, target='removeChannel', user=user),
 			])
 			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
@@ -164,9 +172,7 @@ def listSearchChannels(query, page='1'):
 				thumb = re.search('data-thumb="(?P<thumb>[^"]+)"', entry).group('thumb')
 			except AttributeError:
 				thumb = re.search('<img src="(?P<thumb>[^"]+)"', entry).group('thumb')
-			if thumb.startswith('//'):
-				thumb = 'https:' + thumb
-			thumb = re.sub('/s[0-9]+([^/]+)/', '/s500\g<1>/', thumb)
+			thumb = fix_thumbnail(thumb)
 			subscribers = re.search('>(?P<subscribers>[0-9.]+)</span>', entry).group('subscribers')
 			title = '[B]{}[/B] - {} subscribers'.format(name, subscribers)
 			liz = xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=thumb)
@@ -249,6 +255,15 @@ def removeChannel(user):
 	if showMessages == "true":
 		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=user) + ',5000)')
 	xbmc.executebuiltin("Container.Refresh")
+
+
+def updateThumb(user):
+	content = getUrl('https://www.youtube.com/user/{}'.format(user)).decode('utf-8')
+	thumbnail = re.search('<link itemprop="thumbnailUrl" href="(?P<thumbnail>[^"]+)">', content)
+	if thumbnail:
+		newthumb = fix_thumbnail(thumbnail.group('thumbnail'))
+		write_channels([(oname, ouser, newthumb if ouser == user else othumb, ocategory) for oname, ouser, othumb, ocategory in read_channels()])
+		xbmc.executebuiltin("Container.Refresh")
 
 
 def removeCat(category):
