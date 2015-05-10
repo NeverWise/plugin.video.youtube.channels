@@ -246,7 +246,6 @@ def addChannel(name, user, thumb):
 
 def removeChannel(user):
 	write_channels([channel for channel in read_channels() if channel[1] != user])
-	xbmc.executebuiltin("Container.Refresh")
 	if showMessages == "true":
 		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=user) + ',5000)')
 	xbmc.executebuiltin("Container.Refresh")
