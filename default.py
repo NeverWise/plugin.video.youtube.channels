@@ -94,19 +94,8 @@ def addDir(name, **args):
 	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(**args), listitem=liz, isFolder=True)
 
 
-def addChannelDir(name, iconimage, user, title, desc):
-	liz = xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-	liz.setInfo(type="Video", infoLabels={"Title": title, "Plot": desc})
-	liz.addContextMenuItems([
-		build_context_entry(30026, target='playChannel', user=user),
-		build_context_entry(30002, target='addChannel', user=user, name=name, thumb=iconimage),
-	])
-	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
-
-
 def index():
 	addDir(translation(30001), target='myChannels')
-	addDir(translation(30016), target='listPopular')
 	addDir(translation(30006), target='search')
 	liz = xbmcgui.ListItem("VidStatsX.com", iconImage="DefaultFolder.png", thumbnailImage=iconVSX)
 	liz.setInfo(type="Video", infoLabels={"Title": "VidStatsX.com"})
@@ -166,55 +155,34 @@ def search():
 		listSearchChannels(search_string)
 
 
-def listPopular():
-	content = getUrl("https://gdata.youtube.com/feeds/api/channelstandardfeeds/most_subscribed?max-results=50&v=2")
-	spl = content.split('<entry')
-	for i in range(1, len(spl), 1):
-		entry = spl[i]
-		match = re.compile('<uri>https://gdata.youtube.com/feeds/api/users/(.+?)</uri>', re.DOTALL).findall(entry)
-		user = match[0]
-		match = re.compile("viewCount='(.+?)'", re.DOTALL).findall(entry)
-		viewCount = match[0]
-		match = re.compile("subscriberCount='(.+?)'", re.DOTALL).findall(entry)
-		subscribers = match[0]
-		match = re.compile("<summary>(.+?)</summary>", re.DOTALL).findall(entry)
-		desc = ""
-		if len(match) > 0:
-			desc = match[0]
-			#desc = cleanTitle(desc)
-		match = re.compile("<yt:userId>(.+?)</yt:userId>", re.DOTALL).findall(entry)
-		thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
-		addChannelDir(user, thumb, user, "[B]" + user + "[/B]  -  " + subscribers + " Subscribers", "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
-	xbmcplugin.endOfDirectory(pluginhandle)
-
-
-def listSearchChannels(query, offset='1'):
-	content = getUrl("https://gdata.youtube.com/feeds/api/channels?q=" + query + "&start-index=" + offset + "&max-results=50&v=2")
-	match = re.compile("<openSearch:totalResults>(.+?)</openSearch:totalResults><openSearch:startIndex>(.+?)</openSearch:startIndex>", re.DOTALL).findall(content)
-	maxIndex = int(match[0][0])
-	startIndex = int(match[0][1])
-	spl = content.split('<entry')
-	for i in range(1, len(spl), 1):
-		entry = spl[i]
-		match = re.compile('<uri>https://gdata.youtube.com/feeds/api/users/(.+?)</uri>', re.DOTALL).findall(entry)
-		user = match[0]
-		match = re.compile("viewCount='(.+?)'", re.DOTALL).findall(entry)
-		viewCount = match[0]
-		match = re.compile("subscriberCount='(.+?)'", re.DOTALL).findall(entry)
-		subscribers = match[0]
-		match = re.compile("<title>(.+?)</title>", re.DOTALL).findall(entry)
-		title = match[0]
-		#title = cleanTitle(title)
-		match = re.compile("<summary>(.+?)</summary>", re.DOTALL).findall(entry)
-		desc = ""
-		if len(match) > 0:
-			desc = match[0]
-			#desc = cleanTitle(desc)
-		match = re.compile("<yt:userId>(.+?)</yt:userId>", re.DOTALL).findall(entry)
-		thumb = "http://img.youtube.com/i/" + match[0] + "/mq1.jpg"
-		addChannelDir(title, thumb, user, "[B]" + title + "[/B]  -  " + subscribers + " Subscribers", "Views: " + viewCount + "\nSubscribers: " + subscribers + "\n" + desc)
-	if startIndex + 50 <= maxIndex:
-		addDir(translation(30007), target='listSearchChannels', query=query, offset=int(offset) + 50)
+def listSearchChannels(query, page='1'):
+	content = getUrl('https://www.youtube.com/results?filters=channel&search_query={}&page={}'.format(query, page)).decode('utf-8')
+	entries = content.split('<li><div')[1:]
+	for entry in entries:
+		try:
+			name = cleanTitle(re.search('title="(?P<name>[^"]+)"', entry).group('name'))
+			user = re.search('href="/user/(?P<user>[^"]+)"', entry).group('user')
+			try:
+				thumb = re.search('data-thumb="(?P<thumb>[^"]+)"', entry).group('thumb')
+			except AttributeError:
+				thumb = re.search('<img src="(?P<thumb>[^"]+)"', entry).group('thumb')
+			if thumb.startswith('//'):
+				thumb = 'https:' + thumb
+			thumb = re.sub('/s[0-9]+([^/]+)/', '/s500\g<1>/', thumb)
+			subscribers = re.search('>(?P<subscribers>[0-9.]+)</span>', entry).group('subscribers')
+			title = '[B]{}[/B] - {} subscribers'.format(name, subscribers)
+			liz = xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=thumb)
+			liz.setInfo(type="Video", infoLabels={"Title": title})
+			liz.addContextMenuItems([
+				build_context_entry(30026, target='playChannel', user=user),
+				build_context_entry(30002, target='addChannel', user=user, name=name, thumb=thumb),
+			])
+			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
+		except AttributeError:
+			continue
+	match = re.search('data-link-type="next" data-page="(?P<page>[0-9]+)"', content)
+	if match:
+		addDir(translation(30007), target='listSearchChannels', query=query, page=match.group('page'))
 	xbmcplugin.endOfDirectory(pluginhandle)
 
 
