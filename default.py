@@ -18,6 +18,19 @@ import xbmcgui
 import xbmcplugin
 
 
+class Channel(object):
+	def __init__(self, name, user, thumb, category):
+		self.name = name
+		self.user = user
+		self.thumb = fix_thumbnail(thumb)
+		self.category = category
+
+	def replace(self, **attrs):
+		for attr, value in attrs.items():
+			setattr(self, attr, value)
+		return self
+
+
 def translation(id):
 	return addon.getLocalizedString(id)
 
@@ -27,13 +40,16 @@ def read_channels():
 		try:
 			with open(channelFile, 'rb') as f:
 				for channel in pickle.load(f):
-					yield channel[0], channel[1], fix_thumbnail(channel[2]), channel[3]
+					if isinstance(channel, Channel):
+						yield channel
+					else:
+						yield Channel(*channel)
 		except:
 			with open(channelFile) as channels:
 				for line in channels:
 					match = re.match('^(?P<name>.+?)#(?P<user>.+?)#(?P<thumb>.+?)#(?P<category>.+?)#$', line.strip())
 					if match:
-						yield match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category')
+						yield Channel(match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category'))
 	except IOError:
 		pass
 
@@ -105,32 +121,32 @@ def addItem(name, iconImage='DefaultFolder.png', thumbnailImage=None, contextMen
 def myChannels():
 	categories = set()
 	empty = True
-	for name, user, thumb, category in read_channels():
-		if category == 'NoCat':
+	for channel in read_channels():
+		if channel.category == 'NoCat':
 			addItem(
-				name,
-				thumbnailImage=thumb,
+				channel.name,
+				thumbnailImage=channel.thumb,
 				contextMenu=[
-					build_context_entry(30026, target='playChannel', user=user),
-					build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
-					build_context_entry(30028, target='updateThumb', user=user),
-					build_context_entry(30003, target='removeChannel', user=user),
+					build_context_entry(30026, target='playChannel', user=channel.user),
+					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
+					build_context_entry(30028, target='updateThumb', user=channel.user),
+					build_context_entry(30003, target='removeChannel', user=channel.user),
 					build_context_entry(30006, target='search'),
 				],
 				target='listVideos',
-				user=user,
+				user=channel.user,
 			)
-		elif category not in categories:
-			categories.add(category)
+		elif channel.category not in categories:
+			categories.add(channel.category)
 			addItem(
-				'- ' + category,
+				'- ' + channel.category,
 				contextMenu=[
-					build_context_entry(30009, target='removeCat', category=category),
-					build_context_entry(30012, target='renameCat', category=category),
+					build_context_entry(30009, target='removeCat', category=channel.category),
+					build_context_entry(30012, target='renameCat', category=channel.category),
 					build_context_entry(30006, target='search'),
 				],
 				target='listCat',
-				category=category,
+				category=channel.category,
 			)
 		empty = False
 	if empty:
@@ -144,19 +160,19 @@ def myChannels():
 
 def listCat(category):
 	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
-	for name, user, thumb, cat in read_channels():
-		if cat == category:
+	for channel in read_channels():
+		if channel.category == category:
 			addItem(
-				name,
-				thumbnailImage=thumb,
+				channel.name,
+				thumbnailImage=channel.thumb,
 				contextMenu=[
-					build_context_entry(30026, target='playChannel', user=user),
-					build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
-					build_context_entry(30028, target='updateThumb', user=user),
-					build_context_entry(30003, target='removeChannel', user=user),
+					build_context_entry(30026, target='playChannel', user=channel.user),
+					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
+					build_context_entry(30028, target='updateThumb', user=channel.user),
+					build_context_entry(30003, target='removeChannel', user=channel.user),
 				],
 				target='listVideos',
-				user=user,
+				user=channel.user,
 			)
 	xbmcplugin.endOfDirectory(pluginhandle)
 	if forceViewMode == 'true':
@@ -253,9 +269,7 @@ def addChannel(name, user, thumb):
 			elif category != '':
 				if category == translation(30027):
 					category = 'NoCat'
-				channels = set(channel for channel in read_channels() if channel[1] != user)
-				channels.add((name, user, thumb, category))
-				write_channels(channels)
+				write_channels([channel for channel in read_channels() if channel.user != user] + [Channel(name, user, thumb, category)])
 				if showMessages == 'true':
 					xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
 				xbmc.executebuiltin('Container.Refresh')
@@ -263,7 +277,7 @@ def addChannel(name, user, thumb):
 
 
 def removeChannel(user):
-	write_channels([channel for channel in read_channels() if channel[1] != user])
+	write_channels([channel for channel in read_channels() if channel.user != user])
 	if showMessages == 'true':
 		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=user) + ',5000)')
 	xbmc.executebuiltin('Container.Refresh')
@@ -274,13 +288,13 @@ def updateThumb(user):
 	thumbnail = re.search('<link itemprop="thumbnailUrl" href="(?P<thumbnail>[^"]+)">', content)
 	if thumbnail:
 		newthumb = fix_thumbnail(thumbnail.group('thumbnail'))
-		write_channels([(oname, ouser, newthumb if ouser == user else othumb, ocategory) for oname, ouser, othumb, ocategory in read_channels()])
+		write_channels([channel.replace(thumb=newthumb) if channel.user == user else channel for channel in read_channels()])
 		xbmc.executebuiltin('Container.Refresh')
 
 
 def removeCat(category):
 	if xbmcgui.Dialog().ok('Info:', translation(30010) + '?'):
-		write_channels([channel for channel in read_channels() if channel[3] != category])
+		write_channels([channel for channel in read_channels() if channel.category != category])
 		xbmc.executebuiltin('Container.Refresh')
 
 
@@ -289,7 +303,7 @@ def renameCat(category):
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		newName = keyboard.getText()
-		write_channels([(oname, ouser, othumb, newName if ocategory == category else ocategory) for oname, ouser, othumb, ocategory in read_channels()])
+		write_channels([channel.replace(category=newName) if channel.category == category else channel for channel in read_channels()])
 		xbmc.executebuiltin('Container.Refresh')
 
 
