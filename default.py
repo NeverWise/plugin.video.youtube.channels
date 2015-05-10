@@ -94,18 +94,9 @@ def addDir(name, **args):
 	xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(**args), listitem=liz, isFolder=True)
 
 
-def index():
-	addDir(translation(30001), target='myChannels')
-	addDir(translation(30006), target='search')
-	liz = xbmcgui.ListItem("VidStatsX.com", iconImage="DefaultFolder.png", thumbnailImage=iconVSX)
-	liz.setInfo(type="Video", infoLabels={"Title": "VidStatsX.com"})
-	xbmcplugin.addDirectoryItem(handle=pluginhandle, url="plugin://plugin.video.vidstatsx_com", listitem=liz, isFolder=True)
-	xbmcplugin.endOfDirectory(pluginhandle)
-
-
 def myChannels():
-	xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
 	categories = set()
+	empty = True
 	for name, user, thumb, category in read_channels():
 		if category == "NoCat":
 			liz = xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=thumb)
@@ -114,6 +105,7 @@ def myChannels():
 				build_context_entry(30026, target='playChannel', user=user),
 				build_context_entry(30024, target='addChannel', user=user, name=name, thumb=thumb),
 				build_context_entry(30003, target='removeChannel', user=user),
+				build_context_entry(30006, target='search'),
 			])
 			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listVideos', user=user), listitem=liz, isFolder=True)
 		elif category not in categories:
@@ -123,11 +115,17 @@ def myChannels():
 			liz.addContextMenuItems([
 				build_context_entry(30009, target='removeCat', category=category),
 				build_context_entry(30012, target='renameCat', category=category),
+				build_context_entry(30006, target='search'),
 			])
 			xbmcplugin.addDirectoryItem(handle=pluginhandle, url=build_url(target='listCat', category=category), listitem=liz, isFolder=True)
-	xbmcplugin.endOfDirectory(pluginhandle)
-	if forceViewMode == "true":
-		xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
+		empty = False
+	if empty:
+		search()
+	else:
+		xbmcplugin.endOfDirectory(pluginhandle)
+		xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
+		if forceViewMode == "true":
+			xbmc.executebuiltin('Container.SetViewMode(' + viewMode + ')')
 
 
 def listCat(category):
@@ -152,7 +150,7 @@ def search():
 	keyboard.doModal()
 	if keyboard.isConfirmed() and keyboard.getText():
 		search_string = keyboard.getText().replace(" ", "+")
-		listSearchChannels(search_string)
+		xbmc.executebuiltin('ActivateWindow(videolibrary, ' + build_url(target='listSearchChannels', query=search_string) + ')')
 
 
 def listSearchChannels(query, page='1'):
@@ -276,7 +274,6 @@ xbox = xbmc.getCondVisibility("System.Platform.xbox")
 addon = xbmcaddon.Addon(addonID)
 addon_work_folder = xbmc.translatePath("special://profile/addon_data/" + addonID)
 channelFile = xbmc.translatePath("special://profile/addon_data/" + addonID + "/youtube.channels")
-iconVSX = xbmc.translatePath('special://home/addons/' + addonID + '/iconVSX.png')
 forceViewMode = addon.getSetting("forceView")
 viewMode = str(addon.getSetting("viewMode"))
 showMessages = str(addon.getSetting("showMessages"))
@@ -286,5 +283,5 @@ if not os.path.isdir(addon_work_folder):
 
 
 args = {key: (values[0].decode('utf-8') if len(values) == 1 else values) for key, values in urlparse.parse_qs(sys.argv[2][1:]).items()}
-target = args.pop('target', 'index')
+target = args.pop('target', 'myChannels')
 locals()[target](**args)
