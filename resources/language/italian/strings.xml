@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<strings>
+  <string id="30002">Aggiungi canale</string>
+  <string id="30003">Rimuovi canale</string>
+  <string id="30004">Scegli categoria</string>
+  <string id="30005">Gestione categorie</string>
+  <string id="30006">Ricerca canali</string>
+  <string id="30007">Pagina successiva</string>
+  <string id="30008">Categorie</string>
+  <string id="30009">Rimuovi categoria</string>
+  <string id="30010">Vuoi veramente rimuovere questa categoria?</string>
+  <string id="30011">Nuovo nome per la categoria</string>
+  <string id="30012">Rinomina categoria</string>
+  <string id="30013">impostazioni</string>
+  <string id="30014">Forza visualizzazione</string>
+  <string id="30015">ID visualizzazione</string>
+  <string id="30018">Aggiunto {channel}</string>
+  <string id="30019">Rimosso {channel}</string>
+  <string id="30020">Mostra notifiche</string>
+  <string id="30024">Aggiungi a categoria</string>
+  <string id="30026">Riproduci canale</string>
+  <string id="30027">Nessuna categoria</string>
+  <string id="30028">Aggiorna anteprima</string>
+  <string id="30029">Risoluzione anteprima</string>
+  <string id="30030">Altra modalità</string>
+  <string id="30100">Categoria 01</string>
+  <string id="30101">Categoria 02</string>
+  <string id="30102">Categoria 03</string>
+  <string id="30103">Categoria 04</string>
+  <string id="30104">Categoria 05</string>
+  <string id="30105">Categoria 06</string>
+  <string id="30106">Categoria 07</string>
+  <string id="30107">Categoria 08</string>
+  <string id="30108">Categoria 09</string>
+  <string id="30109">Categoria 10</string>
+  <string id="30110">Categoria 11</string>
+  <string id="30111">Categoria 12</string>
+  <string id="30112">Categoria 13</string>
+  <string id="30113">Categoria 14</string>
+  <string id="30114">Categoria 15</string>
+  <string id="30115">Categoria 16</string>
+  <string id="30116">Categoria 17</string>
+  <string id="30117">Categoria 18</string>
+  <string id="30118">Categoria 19</string>
+  <string id="30119">Categoria 20</string>
+</strings>
