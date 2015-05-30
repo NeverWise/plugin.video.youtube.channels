@@ -27,7 +27,7 @@ class Channel(object):
 		self.mode = int(mode)
 
 	def __repr__(self):
-		return '{}({}, {}, {}, {}, {})'.format(self.__class__.__name__, repr(self.name), repr(self.user), repr(self.thumb), repr(self.category), repr(self.mode))
+		return '{0}({1}, {2}, {3}, {4}, {5})'.format(self.__class__.__name__, repr(self.name), repr(self.user), repr(self.thumb), repr(self.category), repr(self.mode))
 
 	def replace(self, **attrs):
 		for attr, value in attrs.items():
@@ -68,7 +68,12 @@ def get_categories():
 
 
 def build_url(**query):
-	return sys.argv[0] + '?' + urllib.urlencode({key: (value.encode('utf-8') if hasattr(value, 'encode') else value) for key, value in query.items()})
+	urlParams = {}
+	for key, value in query.items():
+		if hasattr(value, 'encode'):
+			value = value.encode('utf-8')
+		urlParams[key] = value
+	return '{0}?{1}'.format(sys.argv[0], urllib.urlencode(urlParams))
 
 
 def build_context_entry(textid, **query):
@@ -156,7 +161,7 @@ def myChannels():
 			)
 		empty = False
 	if empty:
-		search()
+		search(None)
 	else:
 		xbmcplugin.endOfDirectory(pluginhandle)
 		xbmcplugin.addSortMethod(pluginhandle, xbmcplugin.SORT_METHOD_LABEL)
@@ -210,7 +215,7 @@ def listSearchChannels(query, category, page='1'):
 			thumb = fix_thumbnail(thumb)
 			subscribers = re.search('>(?P<subscribers>[0-9.]+)</span>', entry).group('subscribers')
 			addItem(
-				'[B]{}[/B] - {} subscribers'.format(name, subscribers),
+				'[B]{0}[/B] - {1} subscribers'.format(name, subscribers),
 				thumbnailImage=thumb,
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=user),
@@ -232,7 +237,7 @@ def listVideos(user, mode=0, continuation=None):
 		jsondata = json.loads(getUrl('https://www.youtube.com' + continuation))
 		content = jsondata.get('content_html') + jsondata.get('load_more_widget_html')
 	else:
-		content = getUrl('https://www.youtube.com/user/{}/videos'.format(user), view=mode)
+		content = getUrl('https://www.youtube.com/user/{0}/videos'.format(user), view=mode)
 	try:
 		continuation = re.search('data-uix-load-more-href="(?P<url>[^"]+)"', content).group('url').replace('&amp;', '&')
 	except AttributeError:
@@ -256,7 +261,7 @@ def playVideo(url):
 
 
 def playChannel(user, mode=0):
-	content = getUrl('https://www.youtube.com/user/{}/videos'.format(user), view=mode)
+	content = getUrl('https://www.youtube.com/user/{0}/videos'.format(user), view=mode)
 	playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
 	playlist.clear()
 	for yid, duration, title in extract_videos(content):
@@ -292,7 +297,7 @@ def removeChannel(user):
 
 
 def updateThumb(user):
-	content = getUrl('https://www.youtube.com/user/{}'.format(user))
+	content = getUrl('https://www.youtube.com/user/{0}'.format(user))
 	thumbnail = re.search('<link itemprop="thumbnailUrl" href="(?P<thumbnail>[^"]+)">', content)
 	if thumbnail:
 		newthumb = fix_thumbnail(thumbnail.group('thumbnail'))
@@ -330,6 +335,11 @@ if not os.path.isdir(addon_work_folder):
 	os.mkdir(addon_work_folder)
 
 
-args = {key: (values[0].decode('utf-8') if len(values) == 1 else values) for key, values in urlparse.parse_qs(sys.argv[2][1:]).items()}
+args = {}
+for key, values in urlparse.parse_qs(sys.argv[2][1:]).items():
+	if len(values) == 1:
+		values = values[0].decode('utf-8')
+	args[key] = values
+
 target = args.pop('target', 'myChannels')
 locals()[target](**args)
