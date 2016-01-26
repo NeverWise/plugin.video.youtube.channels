@@ -19,12 +19,11 @@ import xbmcplugin
 
 
 class Channel(object):
-	def __init__(self, name, user, thumb, category, mode=0):
+	def __init__(self, name, user, thumb, category):
 		self.name = name
 		self.user = user
 		self.thumb = fix_thumbnail(thumb)
 		self.category = category
-		self.mode = int(mode)
 
 	def __repr__(self):
 		return '{0}({1}, {2}, {3}, {4}, {5})'.format(self.__class__.__name__, repr(self.name), repr(self.user), repr(self.thumb), repr(self.category), repr(self.mode))
@@ -53,7 +52,7 @@ def read_channels():
 				for line in channels:
 					match = re.match('^(?P<name>.+?)#(?P<user>.+?)#(?P<thumb>.+?)#(?P<category>.+?)#$', line.strip())
 					if match:
-						yield Channel(match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category'), 0)
+						yield Channel(match.group('name'), match.group('user'), match.group('thumb') or 'DefaultFolder.png', match.group('category'))
 	except IOError:
 		pass
 
@@ -85,9 +84,13 @@ def extract_videos(content):
 	for entry in entries:
 		try:
 			yid = re.search('<a href="/watch\?v=(?P<id>[^"]+)"', entry).group('id')
-			time = re.search('<span class="video-time".*>(?P<minutes>[0-9]+):(?P<seconds>[0-9]+)</span>', entry)
-			duration = int(time.group('minutes')) * 60 + int(time.group('seconds'))
-			title = HTMLParser.HTMLParser().unescape(re.search('<h3 class="yt-lockup-title">.*>(?P<title>[^<]+)</a>', entry).group('title'))
+			time = re.search('<span class="video-time".*>([0-9:]+)</span>', entry)
+			time = time.group(1).split(':')
+			if len(time) == 2:
+				duration = int(time[0]) * 60 + int(time[1])
+			else:
+				duration = int(time[0]) * 3600 + int(time[1]) * 60 + int(time[2])
+			title = HTMLParser.HTMLParser().unescape(re.search('<h3 class="yt-lockup-title.*">.*>(?P<title>[^<]+)</a>', entry).group('title'))
 			yield yid, duration, title
 		except AttributeError:
 			continue
@@ -103,7 +106,12 @@ def getYoutubeUrl(youtubeID):
 	return ('plugin://video/YouTube/?path=/root/video&action=play_video&videoid=' if xbox else 'plugin://plugin.video.youtube/play/?video_id=') + youtubeID
 
 
-def getUrl(url, **query):
+def getUrl(route, **query):
+	url = 'https://www.youtube.com{0}'
+	if route[0:1] == '/':
+		url = url.format(route)
+	else:
+		url = url.join('/', route);
 	req = urllib2.Request(url + ('?' + urllib.urlencode(query) if query else ''))
 	req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:19.0) Gecko/20100101 Firefox/19.0')
 	response = urllib2.urlopen(req)
@@ -138,14 +146,13 @@ def myChannels():
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=channel.user),
 					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
-					build_context_entry(30030, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb, category=channel.category, mode=54 if channel.mode == 0 else 0),
-					build_context_entry(30028, target='updateThumb', user=channel.user),
+					build_context_entry(30030, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb, category=channel.category, moving=True),
+					build_context_entry(30028, target='updateThumb'),
 					build_context_entry(30003, target='removeChannel', user=channel.user),
 					build_context_entry(30006, target='search', category=channel.category),
 				],
 				target='listVideos',
-				user=channel.user,
-				mode=channel.mode,
+				user=channel.user
 			)
 		elif channel.category not in categories:
 			categories.add(channel.category)
@@ -179,8 +186,8 @@ def listCat(category):
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=channel.user),
 					build_context_entry(30024, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb),
-					build_context_entry(30030, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb, category=channel.category, mode=54 if channel.mode == 0 else 0),
-					build_context_entry(30028, target='updateThumb', user=channel.user),
+					build_context_entry(30030, target='addChannel', user=channel.user, name=channel.name, thumb=channel.thumb, category=channel.category, moving=True),
+					build_context_entry(30028, target='updateThumb'),
 					build_context_entry(30003, target='removeChannel', user=channel.user),
 					build_context_entry(30006, target='search', category=channel.category),
 				],
@@ -202,20 +209,25 @@ def search(category):
 
 
 def listSearchChannels(query, category, page='1'):
-	content = getUrl('https://www.youtube.com/results', filters='channel', search_query=query, page=page)
+	content = getUrl('/results', filters='channel', search_query=query, page=page)
 	entries = content.split('<li><div')[1:]
 	for entry in entries:
 		try:
-			name = HTMLParser.HTMLParser().unescape(re.search('title="(?P<name>[^"]+)"', entry).group('name'))
-			user = re.search('href="/user/(?P<user>[^"]+)"', entry).group('user')
+			user_name = re.search('<a.+href="(.+?)".+<h3.+?title="(.+?)"', entry)
+			name = HTMLParser.HTMLParser().unescape(user_name.group(2))
+			user = user_name.group(1)
 			try:
 				thumb = re.search('data-thumb="(?P<thumb>[^"]+)"', entry).group('thumb')
 			except AttributeError:
 				thumb = re.search('<img src="(?P<thumb>[^"]+)"', entry).group('thumb')
 			thumb = fix_thumbnail(thumb)
-			subscribers = re.search('>(?P<subscribers>[0-9.]+)</span>', entry).group('subscribers')
+			title = None
+			if entry.find('yt-subscriber-count') > -1:
+				title = '[B]{0}[/B] - {1} {2}'.format(name, re.search('>(?P<subscribers>[0-9.]+)</span>', entry).group('subscribers'), translation(30034))
+			else:
+				title = '[B]{0}[/B]'.format(name)
 			addItem(
-				'[B]{0}[/B] - {1} subscribers'.format(name, subscribers),
+				title,
 				thumbnailImage=thumb,
 				contextMenu=[
 					build_context_entry(30026, target='playChannel', user=user),
@@ -234,10 +246,10 @@ def listSearchChannels(query, category, page='1'):
 
 def listVideos(user, mode=0, continuation=None):
 	if continuation is not None:
-		jsondata = json.loads(getUrl('https://www.youtube.com' + continuation))
+		jsondata = json.loads(getUrl(continuation))
 		content = jsondata.get('content_html') + jsondata.get('load_more_widget_html')
 	else:
-		content = getUrl('https://www.youtube.com/user/{0}/videos'.format(user), view=mode)
+		content = getUrl('{0}/videos'.format(user), view=mode)
 	try:
 		continuation = re.search('data-uix-load-more-href="(?P<url>[^"]+)"', content).group('url').replace('&amp;', '&')
 	except AttributeError:
@@ -261,7 +273,7 @@ def playVideo(url):
 
 
 def playChannel(user, mode=0):
-	content = getUrl('https://www.youtube.com/user/{0}/videos'.format(user), view=mode)
+	content = getUrl('{0}/videos'.format(user), view=mode)
 	playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
 	playlist.clear()
 	for yid, duration, title in extract_videos(content):
@@ -270,7 +282,7 @@ def playChannel(user, mode=0):
 	xbmc.Player().play(playlist)
 
 
-def addChannel(name, user, thumb, category=None, mode=0):
+def addChannel(name, user, thumb, category=None, mode=0, moving=False):
 	categories = [translation(30027)] + get_categories() + ['- ' + translation(30005)]
 	while category not in categories + ['NoCat']:
 		dialog = xbmcgui.Dialog()
@@ -283,26 +295,54 @@ def addChannel(name, user, thumb, category=None, mode=0):
 			category = 'NoCat'
 		else:
 			category = categories[index]
-	write_channels([channel for channel in read_channels() if channel.user != user] + [Channel(name, user, thumb, category, mode)])
-	if showMessages == 'true':
-		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30018).format(channel=name) + ',5000)')
+
+	newChannels = []
+	for channel in read_channels():
+		if channel.user != user:
+			newChannels.append(channel)
+
+	newChannels.append(Channel(name, user, thumb, category))
+	write_channels(newChannels)
+
+	if not moving:
+		try:
+			xbmc.executebuiltin('XBMC.Notification({0},{1},5000,{2})'.format(translation(30018), name, notificationIcon))
+		except:
+			pass
 	xbmc.executebuiltin('Container.Refresh')
 
 
 def removeChannel(user):
-	write_channels([channel for channel in read_channels() if channel.user != user])
-	if showMessages == 'true':
-		xbmc.executebuiltin('XBMC.Notification(Info:,' + translation(30019).format(channel=user) + ',5000)')
+	newChannels = []
+	channelToBeRemoved = None
+	for channel in read_channels():
+		if channel.user != user:
+			newChannels.append(channel)
+		else:
+			channelToBeRemoved = channel
+	write_channels(newChannels)
+
+	if channelToBeRemoved:
+		try:
+			xbmc.executebuiltin('XBMC.Notification({0},{1},5000),{2})'.format(translation(30019), channelToBeRemoved.name, notificationIcon))
+		except:
+			pass
 	xbmc.executebuiltin('Container.Refresh')
 
 
-def updateThumb(user):
-	content = getUrl('https://www.youtube.com/user/{0}'.format(user))
-	thumbnail = re.search('<link itemprop="thumbnailUrl" href="(?P<thumbnail>[^"]+)">', content)
-	if thumbnail:
-		newthumb = fix_thumbnail(thumbnail.group('thumbnail'))
-		write_channels([channel.replace(thumb=newthumb) if channel.user == user else channel for channel in read_channels()])
-		xbmc.executebuiltin('Container.Refresh')
+def updateThumb():
+	xbmc.executebuiltin('XBMC.Notification({0},{1},5000,{2})'.format(translation(30031), translation(30032), notificationIcon))
+	newChannels = []
+	for channel in read_channels():
+		content = getUrl(channel.user)
+		thumbnail = re.search('<link itemprop="thumbnailUrl" href="(?P<thumbnail>[^"]+)">', content)
+		if thumbnail:
+			newthumb = fix_thumbnail(thumbnail.group('thumbnail'))
+			channel.replace(thumb=newthumb)
+		newChannels.append(channel)
+	write_channels(newChannels)
+	xbmc.executebuiltin('Container.Refresh')
+	xbmc.executebuiltin('XBMC.Notification({0},{1},5000,{2})'.format(translation(30031), translation(30033), notificationIcon))
 
 
 def removeCat(category):
@@ -329,7 +369,7 @@ addon_work_folder = xbmc.translatePath('special://profile/addon_data/' + addonID
 channelFile = xbmc.translatePath('special://profile/addon_data/' + addonID + '/youtube.channels')
 forceViewMode = addon.getSetting('forceView')
 viewMode = str(addon.getSetting('viewMode'))
-showMessages = str(addon.getSetting('showMessages'))
+notificationIcon = os.path.join(addon.getAddonInfo('path'), 'icon.png')
 
 if not os.path.isdir(addon_work_folder):
 	os.mkdir(addon_work_folder)
